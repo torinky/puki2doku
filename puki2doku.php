@@ -13,12 +13,12 @@
 #                     [-A/--attach]
 #                     [-H/--use-heading]
 #                     [-P pagename.txt(encoded)/--page=pagename.txt(encoded)]
-#                     [-E utf8/--encoding=utf8]
+#                     [-E utf-8/--encoding=utf-8]
 #
 #*****************************************************************************
 /*use strict;
 use warnings;
-use utf8;
+use utf-8;
 use Encode;
 use File::Basename;
 use File::Copy;
@@ -28,7 +28,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Cwd;*/
 
 # If you need.
-# binmode STDOUT, ":utf8";
+# binmode STDOUT, ":utf-8";
 
 
 # ＿・ と全角数字は記号扱いじゃない
@@ -73,7 +73,7 @@ $src_dir = ".";
 $ignore_unknown_macro = '';
 $dont_overwrite = '';
 $specified_page_file = '';
-$input_encoding = "utf8";
+$input_encoding = "utf-8";
 $use_heading = '';
 
 $smiles = [
@@ -136,7 +136,11 @@ $longopts = array(
     'use-heading',
 );
 $options = getopt($shortopts, $longopts);
-if ($options === false || $options['h'] || $options['help']) {
+if (
+    empty($options)
+    || isset($options['h'])
+    || isset($options['help'])
+) {
     usage();
 }
 
@@ -145,13 +149,19 @@ if ($options === false || $options['h'] || $options['help']) {
     while (<>) {
         print $_;
         s/[\r\n]+$//;
-        print encode("utf8", decode($input_encoding, pukiwiki_filename_decode($_))),"\n";
+        print encode("utf-8", decode($input_encoding, pukiwiki_filename_decode($_))),"\n";
     }
     exit;
 }*/
+var_dump($options);
 
 $input_encoding = $options['encoding'] ?? null;
-$input_encoding = $options['E'] ?? null;
+if (empty($input_encoding)) {
+    $input_encoding = $options['E'] ?? null;
+}
+if (empty($input_encoding)) {
+    $input_encoding = 'utf-8';
+}
 
 $decode_mode = $options['decode'] ?? null;
 $decode_mode = $options['D'] ?? null;
@@ -161,7 +171,7 @@ if (!is_null($decode_mode)) {
     $fpr = fopen($decode_mode, 'r');
     while ($line = fgets($fpr)) {
         $line = trim($line);
-        echo mb_convert_encoding(pukiwiki_filename_decode($line), 'utf8', $input_encoding) . PHP_EOL;
+        echo mb_convert_encoding(pukiwiki_filename_decode($line), 'utf-8', $input_encoding) . PHP_EOL;
 
     }
     fclose($fpr);
@@ -178,13 +188,30 @@ elsif (! -w $dst_dir) {
 }*/
 
 $dst_dir = $options['d'] ?? null;
-$dst_dir = $options['dst-dir'] ?? null;
+if (empty($dst_dir)) {
+    $dst_dir = $options['dst-dir'] ?? null;
+
+}
 
 if (!is_dir($dst_dir)) {
     echo $dst_dir . " is not exist" . PHP_EOL;
     exit;
 } elseif (!is_writable($dst_dir)) {
     echo $dst_dir . " is not writable" . PHP_EOL;
+    exit;
+}
+
+$src_dir = $options['s'] ?? null;
+if (empty($src_dir)) {
+    $src_dir = $options['src-dir'] ?? null;
+
+}
+
+if (!is_dir($src_dir)) {
+    echo $src_dir . " is not exist" . PHP_EOL;
+    exit;
+} elseif (!is_readable($src_dir)) {
+    echo $src_dir . " is not readable" . PHP_EOL;
     exit;
 }
 
@@ -237,10 +264,14 @@ if ($attach_file_mode === true) {
         }
     }
 } else {
-    foreach (glob($src_dir) as $filename) {
+    echo 'convert from ' . $src_dir . PHP_EOL;
+//    var_dump(realpath($src_dir).'/*.txt');
+//    var_dump(glob(realpath($src_dir).'/*.txt'));
+    foreach (glob($src_dir . '/*.txt') as $filename) {
+        echo $filename . PHP_EOL;
         if (
             is_file($filename)
-            && preg_match('/\.txt$/ui', $filename)
+//            && preg_match('/\.txt$/ui', $filename)
         ) {
             if (!is_null($specified_page_file) && $filename !== $specified_page_file) {
                 continue;
@@ -266,7 +297,7 @@ function usage()
     print "       [--attach/-A]\n";
     print "       [--use-heading/-H]\n";
     print "       [--page=pagename.txt/-P pagename.txt]\n";
-    print "       [--encoding=utf8/-E utf8]\n";
+    print "       [--encoding=utf-8/-E utf-8]\n";
     exit;
 }
 
@@ -328,19 +359,19 @@ function copy_attach_file($src_file)
     # 既に存在していたら上書きしない
 //    if ($dont_overwrite && -f $dst_file) {
     if ($dont_overwrite && is_file($dst_file)) {
-//        print "SKIP " . encode("utf8", $dst_file),"\n" if ($verbose);
+//        print "SKIP " . encode("utf-8", $dst_file),"\n" if ($verbose);
         if ($verbose) {
-            echo "SKIP " . mb_convert_encoding($dst_file, "utf8") . PHP_EOL;
+            echo "SKIP " . mb_convert_encoding($dst_file, "utf-8") . PHP_EOL;
         }
         return;
     }
 
-//    printf "%s => %s\n", encode("utf8", $src_file), encode("utf8", $dst_file) if ($verbose);
+//    printf "%s => %s\n", encode("utf-8", $src_file), encode("utf-8", $dst_file) if ($verbose);
     if ($verbose) {
-        printf("%s => %s" . PHP_EOL, mb_convert_encoding($src_file, "utf8"), mb_convert_encoding($dst_file, "utf8"));
+        printf("%s => %s" . PHP_EOL, mb_convert_encoding($src_file, "utf-8"), mb_convert_encoding($dst_file, "utf-8"));
     }
     if (copy($src_file, $dst_file)) {
-        echo 'copied : ' . mb_convert_encoding($src_file, "utf8") . PHP_EOL;
+        echo 'copied : ' . mb_convert_encoding($src_file, "utf-8") . PHP_EOL;
     }
 }
 
@@ -364,23 +395,25 @@ function copy_attach_file($src_file)
 
     # 既に存在していたら上書きしない
     if ($dont_overwrite && -f $dst_file) {
-        print "SKIP " . encode("utf8", $dst_file),"\n" if ($verbose);
+        print "SKIP " . encode("utf-8", $dst_file),"\n" if ($verbose);
         return;
     }
 
-    printf "%s => %s\n", encode("utf8", $src_file), encode("utf8", $dst_file) if ($verbose);
+    printf "%s => %s\n", encode("utf-8", $src_file), encode("utf-8", $dst_file) if ($verbose);
 
     copy($src_file, $dst_file);
 }*/
 
 
-function convert_file($src_file)
+function convert_file($src_file = '')
 {
     global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro;
     //    my ($src_file) = @_;
 
     $in_subdir = 0;
 //    $last_line = "";
+
+    echo 'converting... ';
 
 //    my $r = new IO::File $src_file, "r";
     $r = fopen($src_file, 'r');
@@ -397,7 +430,7 @@ function convert_file($src_file)
 
     # 小文字にしたり、記号を変換してないページ名
 //    my $pagename = decode($input_encoding, pukiwiki_filename_decode($src_file));
-    $pagename = mb_convert_encoding(pukiwiki_filename_decode($src_file), 'utf8', $input_encoding);
+    $pagename = mb_convert_encoding(pukiwiki_filename_decode($src_file), 'utf-8', $input_encoding);
 
 //    return if ($pagename =~ /^:/); # 特殊ファイル
     if (preg_match('/^:/ui', $pagename)) {
@@ -419,9 +452,9 @@ function convert_file($src_file)
     # 既に存在していたら上書きしない
 //    if ($dont_overwrite && -f $doku_file) {
     if ($dont_overwrite && is_file($doku_file)) {
-//        print "SKIP " . encode("utf8", $doku_file),"\n" if ($verbose);
+//        print "SKIP " . encode("utf-8", $doku_file),"\n" if ($verbose);
         if ($verbose) {
-            echo "SKIP " . mb_convert_encoding($doku_file, "utf8") . PHP_EOL;
+            echo "SKIP " . mb_convert_encoding($doku_file, "utf-8") . PHP_EOL;
         }
         return false;
     }
@@ -457,7 +490,7 @@ function convert_file($src_file)
 //    while (my $line = <$r>) {
     while ($line = fgets($r)) {
 //    $line = decode($input_encoding, $line);
-        $line = mb_convert_encoding($line, 'utf8', $input_encoding);
+        $line = mb_convert_encoding($line, 'utf-8', $input_encoding);
 //        $line =~ s/[\r\n]+$//;
         $line = preg_replace('/[\r\n]+$/ui', '', $line);
 
@@ -628,11 +661,14 @@ REGEXP
 
         # italic
 //        $line = ~s#'''(.+?)'''#//$1//#g;
-        $line = preg_replace("#'''(.+?)'''#/#ui", "/$1/", $line);
+        $line = preg_replace(/** @lang RegExp */
+            "#'''(.+?)'''#ui", "//$1//", $line);
 
         # bold
 //        $line = ~s / ''(.+?)'' / \*\*$1\*\* / g;
-        $line = preg_replace("/ ''(.+?)'' /ui", '\*\*$1\*\*', $line);
+        $line = preg_replace(/** @lang RegExp */
+//            "/?!([']+)''(.+?)''?!([']+)/ui", '\*\*$1\*\*', $line);
+            "/[^']*''(.+?)''[^']*/ui", '\*\*$1\*\*', $line);
 
         # del
 //        $line = ~s#\%\%(.+?)\%\%#<del>$1</del>#g;
@@ -646,36 +682,40 @@ REGEXP
         # heading
 //        $line = ~s /^\*\s * ([^\*].*?)\[#.*$/heading(6, $1)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*\s * ([^\*].*?)\[#.*$/ui",
+            "/^\*\s([^\*].*?)\[#.*$/ui",
             function ($maches) {
+//                var_dump(mb_convert_variables('sjis-win','utf-8',$maches));
+//                var_dump($maches);
+//                var_dump( heading(6, $maches[1]),'sjis-win');
+//                exit;
                 return heading(6, $maches[1]);
             }, $line);
 
         /*        $line = ~s /^\*{
                                 2}\s * ([^\*].*?)\[#.*$/heading(5, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{2}\s * ([^\*].*?)\[#.*$/ui",
+            "/^\*{2}\s([^\*].*?)\[#.*$/ui",
             function ($maches) {
                 return heading(5, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 3}\s * ([^\*].*?)\[#.*$/heading(4, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{3}\s * ([^\*].*?)\[#.*$/ui",
+            "/^\*{3}\s([^\*].*?)\[#.*$/ui",
             function ($maches) {
                 return heading(4, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 4}\s * ([^\*].*?)\[#.*$/heading(3, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{4}\s * ([^\*].*?)\[#.*$/ui",
+            "/^\*{4}\s([^\*].*?)\[#.*$/ui",
             function ($maches) {
                 return heading(3, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 5}\s * ([^\*].*?)\[#.*$/heading(2, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{5}\s * ([^\*].*?)\[#.*$/ui",
+            "/^\*{5}\s([^\*].*?)\[#.*$/ui",
             function ($maches) {
                 return heading(2, $maches[1]);
             }, $line);
@@ -683,7 +723,7 @@ REGEXP
         # list
 //        $line = ~s /^(\++)\s * ([^\-]*.*)$/convert_ol($1, $2)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\++)\s * ([^\-]*.*)$/ui",
+            "/^(\++)\s([^\-]*.*)$/ui",
             function ($matches) {
                 return convert_ol($matches[1], $matches[2]??'');
             }, $line);
@@ -691,7 +731,7 @@ REGEXP
 
 //        $line = ~s /^(\- +)\s * ([^\-]*.*)$/convert_ul($1, $2)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\- +)\s * ([^\-]*.*)$/ui",
+            "/^(\- +)\s([^\-]*.*)$/ui",
             function ($matches) {
                 return convert_ul($matches[1], $matches[2]??'');
             }, $line);
@@ -699,7 +739,7 @@ REGEXP
         # smile
 //        $line = ~s / \&(\w +);/smile($1)/ge;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/ \&(\w +);/ui",
+            "/ \&(\w+);/ui",
             function ($matches) {
                 return smile($matches[1]);
             }, $line);
@@ -780,7 +820,7 @@ REGEXP
     }
 //    foreach my $line (@doku_lines){
     foreach ($doku_lines as $line) {
-//        print $w encode("utf8", $line);
+//        print $w encode("utf-8", $line);
         fwrite($w, $line);
     }
 //    $w->close;
@@ -825,7 +865,7 @@ function get_last_key($array)
 //
 //    # 既に存在していたら上書きしない
 //    if ($dont_overwrite && -f $doku_file) {
-//        print "SKIP " . encode("utf8", $doku_file),"\n" if ($verbose);
+//        print "SKIP " . encode("utf-8", $doku_file),"\n" if ($verbose);
 //        return;
 //    }
 //
@@ -1007,7 +1047,7 @@ function get_last_key($array)
 //        return;
 //    }
 //    foreach my $line (@doku_lines){
-//    print $w encode("utf8", $line);
+//    print $w encode("utf-8", $line);
 //    }
 //    $w->close;
 //
@@ -1096,7 +1136,7 @@ function convert_ls_indexmenu($src_pagename = '', $namespace = '')
  * @param $format
  * @return string
  */
-function convert_table($line = '', $format)
+function convert_table($line = '', $format = '')
 {
 //                my($line, $format) = @_;
 
@@ -1105,17 +1145,17 @@ function convert_table($line = '', $format)
     $is_footer = 0;
 
 //    if ($line = ~s / \|h$/|/) {
-    if (preg_match(/** @lang RegExp */
-        "/ \|h$/|/ui", $line)) {
+    if (preg_replace(/** @lang RegExp */
+        "/ \|h$/ui", '|', $line)) {
         $is_header = 1;
-    } elseif (preg_match(/** @lang RegExp */
-        "/ \|c$/|/ui", $line)) {
+    } elseif (preg_replace(/** @lang RegExp */
+        "/ \|c$/ui", '|', $line)) {
         # TODO
         $is_format = 1;
         return "";
     } //    elseif( $line = ~s / \|f$/|/) {
-    elseif (preg_match(/** @lang RegExp */
-        "/ \|f$/|/ui", $line)) {
+    elseif (preg_replace(/** @lang RegExp */
+        "/ \|f$/ui", '|', $line)) {
         $is_footer = 1;
         return "";
     }
@@ -1518,9 +1558,10 @@ function convert_filename($filename = '')
     global $input_encoding, $verbose, $KIGO_STR;
 
 //    my $decoded = decode($input_encoding, pukiwiki_filename_decode($filename));
+
     $decoded = mb_convert_encoding(pukiwiki_filename_decode($filename), 'utf-8', $input_encoding);
 
-//    print encode("utf8", $decoded),"\n" if ($verbose) ;
+//    print encode("utf-8", $decoded),"\n" if ($verbose) ;
     if ($verbose) {
         echo $decoded . PHP_EOL;
     }
@@ -1553,7 +1594,7 @@ function convert_filename($filename = '')
     # .-/a-z 以外を url encode
     $dokuwiki_name = dokuwiki_url_encode($decoded);
 
-//    return encode("utf8", $dokuwiki_name);
+//    return encode("utf-8", $dokuwiki_name);
     return $dokuwiki_name;
 }
 
@@ -1562,7 +1603,7 @@ function convert_filename($filename = '')
 //
 //    my $decoded = decode($input_encoding, pukiwiki_filename_decode($filename));
 //
-//    print encode("utf8", $decoded),"\n" if ($verbose) ;
+//    print encode("utf-8", $decoded),"\n" if ($verbose) ;
 //
 //
 //    # マルチバイト => ascii の正規化 結果 _ になるので _ に置換
@@ -1584,7 +1625,7 @@ function convert_filename($filename = '')
 //    # .-/a-z 以外を url encode
 //    my $dokuwiki_name = dokuwiki_url_encode($decoded);
 //
-//    return encode("utf8", $dokuwiki_name);
+//    return encode("utf-8", $dokuwiki_name);
 //}
 
 /*sub pukiwiki_filename_decode {
@@ -1605,23 +1646,24 @@ function convert_filename($filename = '')
 function dokuwiki_url_encode($str = '')
 {
 //    my($str) = @_;
-//    $str = encode("utf8", $str);
+//    $str = encode("utf-8", $str);
     $str = mb_convert_encoding($str, "utf-8");
 //    $str = ~s / ([^a - zA - Z0 - 9_ . \-\/])/uc sprintf("%%%02x", ord($1))/eg;
     $str = preg_replace_callback(/** @lang RegExp */
-        "/ ([^a - zA - Z0 - 9_ . \-/])/ui", function ($matches) {
+        "/ ([^a-zA-Z0-9_.\-\/]+)/ui", function ($matches) {
 //        sprintf("%%%02x", ord($1))
+        var_dump($matches);
         sprintf("%%%02x", ord($matches[1]));
     }, $str);
-//    return decode("utf8", $str);
+//    return decode("utf-8", $str);
     return $str;
 }
 
 //sub dokuwiki_url_encode {
 //    my($str) = @_;
-//    $str = encode("utf8", $str);
+//    $str = encode("utf-8", $str);
 //    $str = ~s / ([^a - zA - Z0 - 9_ . \-\/])/uc sprintf("%%%02x", ord($1))/eg;
-//    return decode("utf8", $str);
+//    return decode("utf-8", $str);
 //}
 
 function strip_decoration($matches = [])
