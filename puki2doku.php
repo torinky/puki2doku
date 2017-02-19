@@ -492,7 +492,7 @@ function convert_file($src_file = '')
 //    $line = decode($input_encoding, $line);
         $line = mb_convert_encoding($line, 'utf-8', $input_encoding);
 //        $line =~ s/[\r\n]+$//;
-        $line = preg_replace('/[\r\n]+$/ui', '', $line);
+        $line = preg_replace("/[\r\n]+\$/ui", '', $line);
 
         # ----
         # #contents
@@ -517,7 +517,7 @@ function convert_file($src_file = '')
 //            foreach (@sp_buf) {
             foreach ($sp_buf as $sp) {
 //                push @doku_lines, $_ . "\n";
-                array_push($doku_lines, $sp . "\n");
+                array_push($doku_lines, $sp . "\r\n");
             }
 //            @sp_buf = ();
             $sp_buf = [];
@@ -541,7 +541,7 @@ function convert_file($src_file = '')
         if (preg_match("/^#prettify{{/", $line)) {
 //            push @doku_lines, "<code>\n" if (!$pre) ;
             if (!$pre) {
-                array_push($doku_lines, "<code>\n");
+                array_push($doku_lines, "<code>");
             }
             $prettify = 1;
 //            next;
@@ -561,11 +561,11 @@ function convert_file($src_file = '')
                 REGEXP*/
                 , $line)) {
 //    push @doku_lines, "</code>\n";
-                array_push($doku_lines, "</code>\n\n");
+                array_push($doku_lines, "</code>\r\n");
                 $prettify = 0;
             } else {
 //                push @doku_lines, $line . "\n";
-                array_push($doku_lines, $line . "\n");
+                array_push($doku_lines, $line . "\r\n");
             }
             continue;
         }
@@ -579,23 +579,23 @@ function convert_file($src_file = '')
                     preg_replace("/ \n$/ui", '', $doku_lines[get_last_key($doku_lines)]);
                 }
 //                push @doku_lines, "<code>\n";
-                array_push($doku_lines, "<code>\n");
+                array_push($doku_lines, "<code>\r\n");
             }
 //            push @doku_lines, $line . "\n";
-            array_push($doku_lines, $line . "\n");
+            array_push($doku_lines, $line . "\r\n");
             $pre = 1;
 //            next;
             continue;
         } elseif ($pre) {
 //        push @doku_lines, "</code>\n";
-            array_push($doku_lines, "</code>\n\n");
+            array_push($doku_lines, "</code>\r\n");
             $pre = 0;
         }
 
 //        if ($line = ~ /^\- + $/) {
         if (preg_match("/^\- + $/ui", $line)) {
 //            push @doku_lines, $line . "\n";
-            array_push($doku_lines, $line . "\n");
+            array_push($doku_lines, $line . "\r\n");
 //            next;
             continue;
         }
@@ -752,8 +752,9 @@ REGEXP
         # table
 //        if ($line = ~ /^\| /) {
         if (preg_match(/** @lang RegExp */
-            "/^\| /ui", $line)) {
+            "/^\|/ui", $line)) {
             $line = convert_table($line);
+//            var_dump($line);
         } else {
             # TODO
             # reset format
@@ -765,16 +766,19 @@ REGEXP
         if (!empty($doku_lines)) {
             if (
 //                $line = ~ /^[\^\|]/
+                //今の行がtable
                 preg_match(/** @lang RegExp */
                     "/^[\^|]/ui", $line)
 //             && $doku_lines[-1] !~ /^[\^\|]/
+                //直前の行がtable
                 && preg_match(/** @lang RegExp */
                     "/^[\^|]/ui", end($doku_lines))
 //            && $doku_lines[-1] ne "")
                 && end($doku_lines) != ""
             ) {
 //                push @doku_lines, "\n";
-                array_push($doku_lines, "\n");
+                //不要っぽい
+//                array_push($doku_lines, "\n");
             }
         }
 
@@ -802,13 +806,13 @@ REGEXP
             array_push($doku_lines, $line . " ");
         } else {
 //            push @doku_lines, $line . "\n";
-            array_push($doku_lines, $line . "\n");
+            array_push($doku_lines, $line . "\r\n");
         }
     }
 
 //    push @doku_lines, "</code>\n" if ($pre) ;
     if ($pre) {
-        array_push($doku_lines, "</code>\n\n");
+        array_push($doku_lines, "</code>\r\n");
     }
 
 //    $r->close;
@@ -1078,7 +1082,7 @@ function heading($n = 1, $str = '')
         $str = $link;
     }
 //    return "=" x $n . " " . $str . " " . "=" x $n;
-    return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n) . '\n';
+    return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n) . "\r\n";
 }
 
 /*sub heading {
@@ -1150,24 +1154,31 @@ function convert_table($line = '', $format = '')
     $is_footer = 0;
 
 //    if ($line = ~s / \|h$/|/) {
-    if (preg_replace(/** @lang RegExp */
-        "/ \|h$/ui", '|', $line)) {
+    if (preg_match(/** @lang RegExp */
+        "/\|h$/ui", $line)) {
+        $line = preg_replace(/** @lang RegExp */
+            "/\|h$/ui", '|', $line);
         $is_header = 1;
-    } elseif (preg_replace(/** @lang RegExp */
-        "/ \|c$/ui", '|', $line)) {
+//        echo 'headder row matched :'.mb_convert_encoding($line,'sjis-win','utf-8').PHP_EOL;
+    } elseif (preg_match(/** @lang RegExp */
+        "/\|c$/ui", $line)) {
+        $line = preg_replace(/** @lang RegExp */
+            "/\|c$/ui", '|', $line);
         # TODO
         $is_format = 1;
-        return "";
+//        return "";
     } //    elseif( $line = ~s / \|f$/|/) {
-    elseif (preg_replace(/** @lang RegExp */
-        "/ \|f$/ui", '|', $line)) {
+    elseif (preg_match(/** @lang RegExp */
+        "/\|f$/ui", $line)) {
+        $line = preg_replace(/** @lang RegExp */
+            "/\|f$/ui", '|', $line);
         $is_footer = 1;
-        return "";
+//        return "";
     }
 
 //    my @cols = split(/\s * \|\s */, $line);
     $cols = preg_split(/** @lang RegExp */
-        "/\s * \|\s */ui", $line);
+        "/\s*\|\s*/ui", $line);
 //    shift @cols;
     array_shift($cols);
 
@@ -1175,18 +1186,20 @@ function convert_table($line = '', $format = '')
 
     $span = 0;
 
+//    echo 'headder row flag:'.$is_header.PHP_EOL;
+
 //    foreach my $col (@cols){
     foreach ($cols as $col) {
 
-        $pos = "";
+        $pos = "LEFT";
 
 //        while ($col = ~s /^(LEFT | CENTER | RIGHT | COLOR\( .*?\) | BGCOLOR\( .*?\) | SIZE\( .*?\))://) {
         while (preg_match(/** @lang RegExp */
-            "/^(LEFT | CENTER | RIGHT | COLOR\( .*?\) | BGCOLOR\( .*?\) | SIZE\( .*?\)):/ui", $col, $matches)) {
+            "/^(LEFT|CENTER|RIGHT|JUSTIFY|COLOR\(.*?\)|BGCOLOR\(.*?\)|SIZE\(.*?\)):/ui", $col, $matches)) {
             $col = preg_replace(/** @lang RegExp */
-                "/^(LEFT | CENTER | RIGHT | COLOR\( .*?\) | BGCOLOR\( .*?\) | SIZE\( .*?\)):/ui", '', $col);
+                "/^(LEFT|CENTER|RIGHT|JUSTIFY|COLOR\(.*?\)|BGCOLOR\(.*?\)|SIZE\(.*?\)):/ui", '', $col);
 //            if ($1 eq "LEFT" || $1 eq "CENTER" || $1 eq "RIGHT") {
-            if ($matches[1] == "LEFT" || $matches[1] == "CENTER" || $matches[1] == "RIGHT") {
+            if ($matches[1] == "LEFT" || $matches[1] == "CENTER" || $matches[1] == "RIGHT" || $matches[1] == "JUSTIFY") {
 //                    $pos = $1;
                 $pos = $matches[1];
             }
@@ -1199,10 +1212,12 @@ function convert_table($line = '', $format = '')
         if ($span == 0) {
 //            $new_line .= ($col = ~s /^~(?!\s * $)// || $is_header) ? '^' : '|';
             if (preg_match(/** @lang RegExp */
-                    "/^~(?!\s * $)/ui", $col) || $is_header
+                    "/^~(?!\s*$)/ui", $col) || $is_header
             ) {
+//                echo 'header column :'.mb_convert_encoding($col,'sjis-win','utf-8').PHP_EOL;
+
                 $col = preg_replace(/** @lang RegExp */
-                    "/^~(?!\s * $)/ui", '', $col);
+                    "/^~(?!\s*$)/ui", '', $col);
                 $new_line .= '^';
 
             } else {
@@ -1218,7 +1233,7 @@ function convert_table($line = '', $format = '')
             continue;
         } //        elsif($col = ~ /^\s * ~\s * $/){
         elseif (preg_match(/** @lang RegExp */
-            "/^\s * ~\s * $/ui", $col)) {
+            "/^\s*~\s*$/ui", $col)) {
             $col = " ::: ";
         } //        elsif($col eq "") {
         elseif ($col == "") {
@@ -1234,6 +1249,8 @@ function convert_table($line = '', $format = '')
         } //        elsif($pos eq "RIGHT") {
         elseif ($pos == "RIGHT") {
             $col = "  " . $col;
+        } elseif ($pos == "JUSTIFY") {
+            $col = trim($col);
         }
 
         $new_line .= $col;
