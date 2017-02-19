@@ -561,7 +561,7 @@ function convert_file($src_file = '')
                 REGEXP*/
                 , $line)) {
 //    push @doku_lines, "</code>\n";
-                array_push($doku_lines, "</code>\n");
+                array_push($doku_lines, "</code>\n\n");
                 $prettify = 0;
             } else {
 //                push @doku_lines, $line . "\n";
@@ -588,7 +588,7 @@ function convert_file($src_file = '')
             continue;
         } elseif ($pre) {
 //        push @doku_lines, "</code>\n";
-            array_push($doku_lines, "</code>\n");
+            array_push($doku_lines, "</code>\n\n");
             $pre = 0;
         }
 
@@ -682,7 +682,8 @@ REGEXP
         # heading
 //        $line = ~s /^\*\s * ([^\*].*?)\[#.*$/heading(6, $1)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*\s([^\*].*?)\[#.*$/ui",
+//            "/^\*\s([^\*].*?)\[#.*$/ui",
+            "/^\*\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
             function ($maches) {
 //                var_dump(mb_convert_variables('sjis-win','utf-8',$maches));
 //                var_dump($maches);
@@ -694,28 +695,32 @@ REGEXP
         /*        $line = ~s /^\*{
                                 2}\s * ([^\*].*?)\[#.*$/heading(5, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{2}\s([^\*].*?)\[#.*$/ui",
+//            "/^\*{2}\s([^\*].*?)\[#.*$/ui",
+            "/^\*{2}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
             function ($maches) {
                 return heading(5, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 3}\s * ([^\*].*?)\[#.*$/heading(4, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{3}\s([^\*].*?)\[#.*$/ui",
+//            "/^\*{3}\s([^\*].*?)\[#.*$/ui",
+            "/^\*{3}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
             function ($maches) {
                 return heading(4, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 4}\s * ([^\*].*?)\[#.*$/heading(3, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{4}\s([^\*].*?)\[#.*$/ui",
+//            "/^\*{4}\s([^\*].*?)\[#.*$/ui",
+            "/^\*{4}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
             function ($maches) {
                 return heading(3, $maches[1]);
             }, $line);
         /*        $line = ~s /^\*{
                                 5}\s * ([^\*].*?)\[#.*$/heading(2, $1)/e;*/
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^\*{5}\s([^\*].*?)\[#.*$/ui",
+//            "/^\*{5}\s([^\*].*?)\[#.*$/ui",
+            "/^\*{5}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
             function ($maches) {
                 return heading(2, $maches[1]);
             }, $line);
@@ -731,7 +736,7 @@ REGEXP
 
 //        $line = ~s /^(\- +)\s * ([^\-]*.*)$/convert_ul($1, $2)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\- +)\s([^\-]*.*)$/ui",
+            "/^(\-+)\s([^\-]*.*)$/ui",
             function ($matches) {
                 return convert_ul($matches[1], $matches[2]??'');
             }, $line);
@@ -803,7 +808,7 @@ REGEXP
 
 //    push @doku_lines, "</code>\n" if ($pre) ;
     if ($pre) {
-        array_push($doku_lines, "</code>\n");
+        array_push($doku_lines, "</code>\n\n");
     }
 
 //    $r->close;
@@ -1073,7 +1078,7 @@ function heading($n = 1, $str = '')
         $str = $link;
     }
 //    return "=" x $n . " " . $str . " " . "=" x $n;
-    return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n);
+    return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n) . '\n';
 }
 
 /*sub heading {
