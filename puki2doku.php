@@ -509,9 +509,15 @@ function convert_file($src_file = '')
 //            next;
             continue;
         } //        elsif($line eq "#contents" && scalar(@sp_buf) == 1) {
-        elseif (preg_match("/^#contents/ui", $line) && count($sp_buf) == 1) {
+        elseif (preg_match(/** @lang RegExp */
+                "/^#contents/ui", $line) && count($sp_buf) == 1
+        ) {
             array_push($sp_buf, $line);
 //            next;
+            continue;
+            //コメント行
+        } elseif (preg_match(/** @lang RegExp */
+            "!^//.*!ui", $line)) {
             continue;
         } else {
 //            foreach (@sp_buf) {
