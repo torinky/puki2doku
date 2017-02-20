@@ -517,7 +517,7 @@ function convert_file($src_file = '')
             continue;
             //コメント行
         } elseif (preg_match(/** @lang RegExp */
-            "!^//.*!ui", $line)) {
+            "!^//.*$!ui", $line)) {
             continue;
         } else {
 //            foreach (@sp_buf) {
@@ -599,17 +599,27 @@ function convert_file($src_file = '')
         }
 
 //        if ($line = ~ /^\- + $/) {
-        if (preg_match("/^\- + $/ui", $line)) {
+        //段落記号のみの行
+        if (preg_match(/** @lang RegExp */
+            "/^[\s\-*]+$/ui", $line)) {
 //            push @doku_lines, $line . "\n";
-            array_push($doku_lines, $line . "\r\n");
+//            array_push($doku_lines, $line . "\r\n");
+            array_push($doku_lines, "\r\n");
 //            next;
             continue;
         }
+        //文字修飾の半分のみはhtml変換に失敗する
+        //イタリック指示の半分のみを全角に置換
+        if (mb_substr_count($line, '//') % 2 == 1) {
+            $line = preg_replace("!//!ui", '**Not pair slashes**', $line, 1);
+        }
+
 
         # ref
 //        $line = ~s / \&ref\((.+?)\);/convert_ref($pagename, $1)/ge;
 //        $line = ~s /#ref\((.+?)\)/convert_ref($pagename, $1)/ge;
-        preg_replace_callback("/ [\&#].ref\((.+?)\);/ui", function ($matches) use ($pagename) {
+        preg_replace_callback(/** @lang RegExp */
+            "/[\&#].ref\((.+?)\);/ui", function ($matches) use ($pagename) {
             return convert_ref($pagename, $matches[1]);
         }, $line);
 
@@ -638,7 +648,7 @@ function convert_file($src_file = '')
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/ &(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
+/&(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / \&(\w +)\(([^\(\)]+?)\){
@@ -648,7 +658,7 @@ REGEXP
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                    ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/ &(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
+/&(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / &(\w +)\(([^\(\)]+?)\){
@@ -659,31 +669,42 @@ REGEXP
         # 改行置換
 //        $line = ~s / ~$/\\\\ /;
         $line = preg_replace(/** @lang RegExp */
-            "/ ~$/ui", "\\\\ ", $line);
+            "/~$/ui", "\\\\ ", $line);
 
 //        $line = ~s / \&br;/\\\\ / g;
         $line = preg_replace(/** @lang RegExp */
-            "/ \&br;/ui", "\\\\ ", $line);
+            "/\&br;/ui", "\\\\ ", $line);
 
         # italic
 //        $line = ~s#'''(.+?)'''#//$1//#g;
         $line = preg_replace(/** @lang RegExp */
-            "#'''(.+?)'''#ui", "//$1//", $line);
+            "#'''(.+?)'''#ui", " //$1// ", $line);
 
         # bold
 //        $line = ~s / ''(.+?)'' / \*\*$1\*\* / g;
         $line = preg_replace(/** @lang RegExp */
-//            "/?!([']+)''(.+?)''?!([']+)/ui", '\*\*$1\*\*', $line);
-            "/[^']*''(.+?)''[^']*/ui", '\*\*$1\*\*', $line);
+//            "/[^']''(.+?)''[^']/ui", " **$1** ", $line);
+            "/''(.+?)''/ui", " **$1** ", $line);
+
+        #code
+        $line = preg_replace(/** @lang RegExp */
+            "#@@@(.+)@@@#ui", "<code>$1</code>", $line);
 
         # del
 //        $line = ~s#\%\%(.+?)\%\%#<del>$1</del>#g;
         $line = preg_replace(/** @lang RegExp */
-            "#\%\%(.+?)\%\%#ui", "<del>$1</del>", $line);
+            "#%%(.+?)%%#ui", "<del>$1</del>", $line);
+        $line = preg_replace(/** @lang RegExp */
+            "#___(.+?)___#ui", "<del>$1</del>", $line);
+        $line = preg_replace(/** @lang RegExp */
+            "#@@(.+?)@@#ui", "<del>$1</del>", $line);
+
 
         # escape
 //        $line = ~s#(?:^|[^:])(//)#%%$1%%#g;
-        $line = preg_replace("#(?:^|[^:])(//)#ui", "%%$1%%", $line);
+        $line = preg_replace(/** @lang RegExp */
+            "#(?:^|[^:])([^\s]//[^\s])#ui", "%%$1%%", $line);
+
 
         # heading
 //        $line = ~s /^\*\s * ([^\*].*?)\[#.*$/heading(6, $1)/e;
@@ -734,7 +755,7 @@ REGEXP
         # list
 //        $line = ~s /^(\++)\s * ([^\-]*.*)$/convert_ol($1, $2)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\++)\s([^\-]*.*)$/ui",
+            "/^(\++)\s{0,1}([^\-]*.*)$/ui",
             function ($matches) {
                 return convert_ol($matches[1], $matches[2]??'');
             }, $line);
@@ -742,7 +763,7 @@ REGEXP
 
 //        $line = ~s /^(\- +)\s * ([^\-]*.*)$/convert_ul($1, $2)/e;
         $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\-+)\s([^\-]*.*)$/ui",
+            "/^(\-+)\s{0,1}([^\-]*.*)$/ui",
             function ($matches) {
                 return convert_ul($matches[1], $matches[2]??'');
             }, $line);
@@ -774,17 +795,16 @@ REGEXP
 //                $line = ~ /^[\^\|]/
                 //今の行がtable
                 preg_match(/** @lang RegExp */
-                    "/^[\^|]/ui", $line)
+                    "/^[|\^]/ui", $line)
 //             && $doku_lines[-1] !~ /^[\^\|]/
-                //直前の行がtable
+                //直前の行がtableでない
                 && preg_match(/** @lang RegExp */
-                    "/^[\^|]/ui", end($doku_lines))
+                    "/^[^|\^]/ui", end($doku_lines))
 //            && $doku_lines[-1] ne "")
                 && end($doku_lines) != ""
             ) {
 //                push @doku_lines, "\n";
-                //不要っぽい
-//                array_push($doku_lines, "\n");
+                array_push($doku_lines, "\r\n");
             }
         }
 
