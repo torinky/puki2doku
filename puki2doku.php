@@ -63,9 +63,9 @@ $KIGO_ARRAY = [
 $KIGO_STR = implode("", $KIGO_ARRAY);
 
 $verbose = '';
-$use_font_color_plugin = '';
-$use_font_size_plugin = '';
-$use_indexmenu_plugin = '';
+$use_font_color_plugin = false;
+$use_font_size_plugin = false;
+$use_indexmenu_plugin = false;
 $dst_dir = "./pages"; # "-s"オプションが省略された場合に備えて
 $decode_mode = '';
 $attach_file_mode = '';
@@ -153,7 +153,6 @@ if (
     }
     exit;
 }*/
-var_dump($options);
 
 $input_encoding = $options['encoding'] ?? null;
 if (empty($input_encoding)) {
@@ -253,6 +252,20 @@ $verbose = $options['verbose'] ?? null;
 $specified_page_file = $options['P'] ?? null;
 $specified_page_file = $options['page'] ?? null;
 
+$use_font_color_plugin = isset($options['C']);
+if (!$use_font_color_plugin) {
+    $use_font_color_plugin = isset($options['font-color']);
+}
+// fontsize2 Plugin
+// https://www.dokuwiki.org/plugin:fontsize2
+$use_font_size_plugin = isset($options['S']);
+if (!$use_font_size_plugin) {
+    $use_font_size_plugin = isset($options['font-size']);
+}
+
+var_dump($options);
+var_dump($use_font_color_plugin);
+var_dump($use_font_size_plugin);
 
 if ($attach_file_mode === true) {
     foreach (glob($src_dir) as $filename) {
@@ -611,7 +624,7 @@ function convert_file($src_file = '')
         //文字修飾の半分のみはhtml変換に失敗する
         //イタリック指示の半分のみを全角に置換
         if (mb_substr_count($line, '//') % 2 == 1) {
-            $line = preg_replace("!//!ui", '**Not pair slashes**', $line, 1);
+            $line = preg_replace("![^:](//)!ui", '**Not pair slashes**', $line, 1);
         }
 
 
@@ -648,7 +661,7 @@ function convert_file($src_file = '')
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/&(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
+/&(\w+)\(([^()]+?)\)\{([^{]*?)\}/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / \&(\w +)\(([^\(\)]+?)\){
@@ -658,7 +671,7 @@ REGEXP
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                    ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/&(\w +)\(([^()]+?)\)\{([^{]*?)\};/ui
+/&(\w+)\(([^()]+?)\)\{([^{]*?)\}/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / &(\w +)\(([^\(\)]+?)\){
@@ -1722,19 +1735,27 @@ function strip_decoration($matches = [])
     $attr = $matches[2] ?? '';
     $str = $matches[3]??'';
 
+
 //    if ($type eq "size" && $use_font_size_plugin) {
-    if ($type = "size" && $use_font_size_plugin) {
-        if ($attr > 20) {
+    if ($type == "size" && $use_font_size_plugin && !empty($attr)) {
+        $tmp = $matches;
+        mb_convert_variables('sjis-win', 'utf-8', $tmp);
+        var_dump($tmp);
+        return sprintf('<fs %spx>%s</fs>', $attr, $str);
+
+        /*        if ($attr > 20) {
 //            return sprintf qq(####%s####), $str;
-            return sprintf('"####%s####)"', $str);
+            return sprintf('####%s####', $str);
         } else {
 //            return sprintf qq(##%s##), $str;
-            return sprintf('"##%s##)"', $str);
-        }
+            return sprintf('##%s##', $str);
+        }*/
     } //    elsif($type eq "color" && $use_font_color_plugin) {
-    elseif ($type == "color" && $use_font_color_plugin) {
+    elseif ($type == "color" && $use_font_color_plugin && !empty($attr)) {
 //        return sprintf qq(<color % s / white>%s </color >), $attr, $str;
-        return sprintf('"<color % s / white>%s </color >)"', $attr, $str);
+//        return sprintf('<color %s/white>%s</color>', $attr, $str);
+        $attr = strtr($attr, ',', '/');
+        return sprintf('<color %s>%s</color>', $attr, $str);
     } else {
         return $str;
     }
