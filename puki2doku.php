@@ -661,7 +661,7 @@ function convert_file($src_file = '')
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/&(\w+)\(([^()]+?)\)\{([^{]*?)\}/ui
+/&(\w+)\(([^()]+?)\)\{([^{]*?)\}[;]{0,1}/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / \&(\w +)\(([^\(\)]+?)\){
@@ -671,7 +671,7 @@ REGEXP
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
 //                    ([^\{]*?)};/strip_decoration($1, $2, $3)/ge;
         $line = preg_replace_callback(<<<REGEXP
-/&(\w+)\(([^()]+?)\)\{([^{]*?)\}/ui
+/&(\w+)\(([^()]+?)\)\{([^{]*?)\}[;]{0,1}/ui
 REGEXP
             /*        $line = preg_replace_callback(<<<REGEXP
             / &(\w +)\(([^\(\)]+?)\){
