@@ -283,7 +283,7 @@ if ($attach_file_mode === true) {
     foreach (glob($src_dir . '/*.txt') as $filename) {
         echo $filename . PHP_EOL;
         if (
-            is_file($filename)
+        is_file($filename)
 //            && preg_match('/\.txt$/ui', $filename)
         ) {
             if (!is_null($specified_page_file) && $filename !== $specified_page_file) {
@@ -321,7 +321,13 @@ function usage()
  */
 function pukiwiki_filename_decode($str)
 {
-    return pkwk_hex2bin($str);
+    $path = pathinfo($str);
+//    var_dump(pkwk_hex2bin($str));
+    $path['filename'] = pkwk_hex2bin($path['filename']);
+    var_dump($path);
+
+    return $path['dirname'] . DIRECTORY_SEPARATOR . $path['filename'] . '.' . $path['extension'];
+//    return pkwk_hex2bin($str);
 }
 
 /**
@@ -426,7 +432,7 @@ function convert_file($src_file = '')
     $in_subdir = 0;
 //    $last_line = "";
 
-    echo 'converting... ';
+    echo 'converting... ' . PHP_EOL;
 
 //    my $r = new IO::File $src_file, "r";
     $r = fopen($src_file, 'r');
@@ -458,9 +464,9 @@ function convert_file($src_file = '')
     /*    my $doku_file = sprintf "%s/%s",
                                 $dst_dir,
                                 $dokuwiki_filename;*/
-    $doku_file = sprintf("%s/%s",
+    $doku_file = sprintf("%s" . DIRECTORY_SEPARATOR . "%s",
         $dst_dir,
-        $dokuwiki_filename);
+        preg_replace("#/#ui", DIRECTORY_SEPARATOR, $dokuwiki_filename));
 
     # 既に存在していたら上書きしない
 //    if ($dont_overwrite && -f $doku_file) {
@@ -477,7 +483,7 @@ function convert_file($src_file = '')
 //    if (! -d $doku_file_dir) {
     if (!is_dir($doku_file_dir)) {
 //        mkpath($doku_file_dir);
-        if (!mkdir($doku_file_dir)) {
+        if (!mkdir($doku_file_dir . DIRECTORY_SEPARATOR, 0777, true)) {
             echo "can't make directly : " . $doku_file_dir . PHP_EOL;
             return false;
         }
@@ -1620,6 +1626,7 @@ function convert_filename($filename = '')
 
 //    my $decoded = decode($input_encoding, pukiwiki_filename_decode($filename));
 
+
     $decoded = mb_convert_encoding(pukiwiki_filename_decode($filename), 'utf-8', $input_encoding);
 
 //    print encode("utf-8", $decoded),"\n" if ($verbose) ;
@@ -1638,7 +1645,7 @@ function convert_filename($filename = '')
     # 末尾の _ は削る
 //    $decoded = ~s / [_\.\-]+.txt$/.txt /;
     $decoded = preg_replace(/** @lang RegExp */
-        "/ [_\.\-]+.txt$/ui", ".txt", $decoded);
+        "/[\.\-]+.txt$/ui", ".txt", $decoded);
     # ディレクトリの末尾からも削る
 //    $decoded = ~s#[_\.\-]+/#/#g;
     $decoded = preg_replace(/** @lang RegExp */
@@ -1654,6 +1661,8 @@ function convert_filename($filename = '')
 
     # .-/a-z 以外を url encode
     $dokuwiki_name = dokuwiki_url_encode($decoded);
+
+    var_dump($decoded);
 
 //    return encode("utf-8", $dokuwiki_name);
     return $dokuwiki_name;
@@ -1738,9 +1747,9 @@ function strip_decoration($matches = [])
 
 //    if ($type eq "size" && $use_font_size_plugin) {
     if ($type == "size" && $use_font_size_plugin && !empty($attr)) {
-        $tmp = $matches;
-        mb_convert_variables('sjis-win', 'utf-8', $tmp);
-        var_dump($tmp);
+        /*        $tmp = $matches;
+                mb_convert_variables('sjis-win', 'utf-8', $tmp);
+                var_dump($tmp);*/
         return sprintf('<fs %spx>%s</fs>', $attr, $str);
 
         /*        if ($attr > 20) {
