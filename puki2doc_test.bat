@@ -1,0 +1,1 @@
+php puki2doku.php -s testSrc -d testDst --font-size --font-color --v > puki2doku.log
