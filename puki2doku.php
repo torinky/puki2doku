@@ -75,6 +75,7 @@ $dont_overwrite = '';
 $specified_page_file = '';
 $input_encoding = "utf-8";
 $use_heading = '';
+$destLang = 'ja';
 
 $smiles = [
     'smile' => ' :-) ',
@@ -426,7 +427,7 @@ function copy_attach_file($src_file)
 
 function convert_file($src_file = '')
 {
-    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro;
+    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro,$destLang;
     //    my ($src_file) = @_;
 
     $in_subdir = 0;
@@ -507,11 +508,32 @@ function convert_file($src_file = '')
     }
 
 //    while (my $line = <$r>) {
+    //1行ずつ読み込む
+    $multiLangFlag=null;
     while ($line = fgets($r)) {
 //    $line = decode($input_encoding, $line);
         $line = mb_convert_encoding($line, 'utf-8', $input_encoding);
 //        $line =~ s/[\r\n]+$//;
         $line = preg_replace("/[\r\n]+\$/ui", '', $line);
+
+        //国際化されていたらjaのみ取り出す
+//        if(strpos($line,'#multilang(ja){{{')!==false){
+        if(preg_match('/#multilang\(([a-z]{2,3})\)\{\{\{/ui',$line,$langMatches)){
+            $multiLangFlag=$langMatches[1];
+            continue;
+        }
+        if($multiLangFlag==$destLang && strpos($line,'}}}')!==false){
+            $multiLangFlag=null;
+            continue;
+        }
+        //他の言語なら読み飛ばす
+        if($multiLangFlag!==$destLang ){
+            while($line===false || strpos($line,'}}}')!==false ){
+                $line=fgets($r);
+            }
+            $multiLangFlag =null;
+            continue;
+        }
 
         # ----
         # #contents
