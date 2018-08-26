@@ -120,7 +120,7 @@ $shortopts .= "E::"; //input_encoding,
 $shortopts .= "H"; //use_heading,
 
 
-$longopts = array(
+$longopts = [
     'verbose',
     'font-color',
     'font-size',
@@ -135,7 +135,7 @@ $longopts = array(
     'do-not-overwrite',
     'encoding::',
     'use-heading',
-);
+];
 $options = getopt($shortopts, $longopts);
 if (
     empty($options)
@@ -383,6 +383,7 @@ function copy_attach_file($src_file)
         if ($verbose) {
             echo "SKIP " . mb_convert_encoding($dst_file, "utf-8") . PHP_EOL;
         }
+
         return;
     }
 
@@ -427,7 +428,7 @@ function copy_attach_file($src_file)
 
 function convert_file($src_file = '')
 {
-    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro,$destLang;
+    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro, $destLang;
     //    my ($src_file) = @_;
 
     $in_subdir = 0;
@@ -476,6 +477,7 @@ function convert_file($src_file = '')
         if ($verbose) {
             echo "SKIP " . mb_convert_encoding($doku_file, "utf-8") . PHP_EOL;
         }
+
         return false;
     }
 
@@ -486,6 +488,7 @@ function convert_file($src_file = '')
 //        mkpath($doku_file_dir);
         if (!mkdir($doku_file_dir . DIRECTORY_SEPARATOR, 0777, true)) {
             echo "can't make directly : " . $doku_file_dir . PHP_EOL;
+
             return false;
         }
     }
@@ -509,7 +512,7 @@ function convert_file($src_file = '')
 
 //    while (my $line = <$r>) {
     //1行ずつ読み込む
-    $multiLangFlag=null;
+    $multiLangFlag = null;
     while ($line = fgets($r)) {
 //    $line = decode($input_encoding, $line);
         $line = mb_convert_encoding($line, 'utf-8', $input_encoding);
@@ -517,21 +520,20 @@ function convert_file($src_file = '')
         $line = preg_replace("/[\r\n]+\$/ui", '', $line);
 
         //国際化されていたらjaのみ取り出す
-//        if(strpos($line,'#multilang(ja){{{')!==false){
-        if(preg_match('/#multilang\(([a-z]{2,3})\)\{\{\{/ui',$line,$langMatches)){
-            $multiLangFlag=$langMatches[1];
+        if (preg_match('/#multilang\(([a-zA-Z_]{2,8})\)[\{]{2,3}/ui', $line, $langMatches)) {
+            $multiLangFlag = $langMatches[1];
             continue;
         }
-        if($multiLangFlag==$destLang && strpos($line,'}}}')!==false){
-            $multiLangFlag=null;
+        if ($multiLangFlag == $destLang && preg_match('/[\}]{2,3}/',$line)) {
+            $multiLangFlag = null;
             continue;
         }
         //他の言語なら読み飛ばす
-        if($multiLangFlag!==$destLang ){
-            while($line===false || strpos($line,'}}}')!==false ){
-                $line=fgets($r);
+        if ($multiLangFlag !== null && $multiLangFlag !== $destLang) {
+            while ($line !== false && !preg_match('/[\}]{2,3}/',$line)) {
+                $line = fgets($r);
             }
-            $multiLangFlag =null;
+            $multiLangFlag = null;
             continue;
         }
 
@@ -798,7 +800,7 @@ REGEXP
         $line = preg_replace_callback(/** @lang RegExp */
             "/^(\++)\s{0,1}([^\-]*.*)$/ui",
             function ($matches) {
-                return convert_ol($matches[1], $matches[2]??'');
+                return convert_ol($matches[1], $matches[2] ?? '');
             }, $line);
 
 
@@ -806,7 +808,7 @@ REGEXP
         $line = preg_replace_callback(/** @lang RegExp */
             "/^(\-+)\s{0,1}([^\-]*.*)$/ui",
             function ($matches) {
-                return convert_ul($matches[1], $matches[2]??'');
+                return convert_ul($matches[1], $matches[2] ?? '');
             }, $line);
 
         # smile
@@ -892,6 +894,7 @@ REGEXP
     if ($w === false) {
 //    warn "can't open $doku_file: $!";
         echo "can't open " . $doku_file . PHP_EOL;
+
         return false;
     }
 //    foreach my $line (@doku_lines){
@@ -905,12 +908,14 @@ REGEXP
     # copy last modified
 //    system("/bin/touch", "-r", $src_file, $doku_file);
     touch($doku_file, $fileModified);
+
     return true;
 }
 
 function get_last_key($array)
 {
     end($array);
+
     return key($array);
 }
 
@@ -1148,6 +1153,7 @@ function heading($n = 1, $str = '')
         $link = preg_replace("/^.*[>\|]+/ui", '', $link);
         $str = $link;
     }
+
 //    return "=" x $n . " " . $str . " " . "=" x $n;
     return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n) . "\r\n";
 }
@@ -1747,6 +1753,7 @@ function dokuwiki_url_encode($str = '')
         var_dump($matches);
         sprintf("%%%02x", ord($matches[1]));
     }, $str);
+
 //    return decode("utf-8", $str);
     return $str;
 }
@@ -1762,9 +1769,9 @@ function strip_decoration($matches = [])
 {
 //    my($type, $attr, $str) = @_;
     global $use_font_size_plugin, $use_font_color_plugin;
-    $type = strtolower($matches[1])?? "";
+    $type = strtolower($matches[1]) ?? "";
     $attr = $matches[2] ?? '';
-    $str = $matches[3]??'';
+    $str = $matches[3] ?? '';
 
 
 //    if ($type eq "size" && $use_font_size_plugin) {
@@ -1786,6 +1793,7 @@ function strip_decoration($matches = [])
 //        return sprintf qq(<color % s / white>%s </color >), $attr, $str;
 //        return sprintf('<color %s/white>%s</color>', $attr, $str);
         $attr = strtr($attr, ',', '/');
+
         return sprintf('<color %s>%s</color>', $attr, $str);
     } else {
         return $str;
