@@ -715,40 +715,7 @@ REGEXP
             $line.='\\\\ ';
 
         }
-
-//        $line = ~s / \&br;/\\\\ / g;
-        $line = preg_replace(/** @lang RegExp */
-            "/\&br;/ui", "\\\\ ", $line);
-
-        # italic
-//        $line = ~s#'''(.+?)'''#//$1//#g;
-        $line = preg_replace(/** @lang RegExp */
-            "#'''(.+?)'''#ui", " //$1// ", $line);
-
-        # bold
-//        $line = ~s / ''(.+?)'' / \*\*$1\*\* / g;
-        $line = preg_replace(/** @lang RegExp */
-//            "/[^']''(.+?)''[^']/ui", " **$1** ", $line);
-            "/''(.+?)''/ui", " **$1** ", $line);
-
-        #code
-        $line = preg_replace(/** @lang RegExp */
-            "#@@@(.+)@@@#ui", "<code>$1</code>", $line);
-
-        # del
-//        $line = ~s#\%\%(.+?)\%\%#<del>$1</del>#g;
-        $line = preg_replace(/** @lang RegExp */
-            "#%%(.+?)%%#ui", "<del>$1</del>", $line);
-        $line = preg_replace(/** @lang RegExp */
-            "#___(.+?)___#ui", "<del>$1</del>", $line);
-        $line = preg_replace(/** @lang RegExp */
-            "#@@(.+?)@@#ui", "<del>$1</del>", $line);
-
-
-        # escape
-//        $line = ~s#(?:^|[^:])(//)#%%$1%%#g;
-        $line = preg_replace(/** @lang RegExp */
-            "#(?:^|[^:])([^\s]//[^\s])#ui", "%%$1%%", $line);
+        $line = decoration($line);
 
 
         # heading
@@ -912,6 +879,58 @@ REGEXP
     touch($doku_file, $fileModified);
 
     return true;
+}
+
+/**
+ * @param $line
+ * @return string|string[]|null
+ */
+function decoration($line)
+{
+    if (empty($line)) {
+        return '';
+    }
+    var_dump('decoration!');
+    var_dump($line);
+//        $line = ~s / \&br;/\\\\ / g;
+    $line = preg_replace(/** @lang RegExp */
+        "/\&br;/ui", "\\\\ ", $line);
+
+    # italicBold
+    $line = preg_replace(/** @lang RegExp */
+        "#'''''(.+?)'''''#ui", " // ** $1 ** // ", $line);
+
+    # italic
+//        $line = ~s#'''(.+?)'''#//$1//#g;
+    $line = preg_replace(/** @lang RegExp */
+        "#'''(.+?)'''#ui", " //$1// ", $line);
+
+    # bold
+//        $line = ~s / ''(.+?)'' / \*\*$1\*\* / g;
+    $line = preg_replace(/** @lang RegExp */
+//            "/[^']''(.+?)''[^']/ui", " **$1** ", $line);
+        "/''(.+?)''/ui", " **$1** ", $line);
+
+    #code
+    $line = preg_replace(/** @lang RegExp */
+        "#@@@(.+)@@@#ui", "<code>$1</code>", $line);
+
+    # del
+//        $line = ~s#\%\%(.+?)\%\%#<del>$1</del>#g;
+    $line = preg_replace(/** @lang RegExp */
+        "#%%(.+?)%%#ui", "<del>$1</del>", $line);
+    $line = preg_replace(/** @lang RegExp */
+        "#___(.+?)___#ui", "<del>$1</del>", $line);
+    $line = preg_replace(/** @lang RegExp */
+        "#@@(.+?)@@#ui", "<del>$1</del>", $line);
+
+
+    # escape
+//        $line = ~s#(?:^|[^:])(//)#%%$1%%#g;
+    $line = preg_replace(/** @lang RegExp */
+        "#(?:^|[^:])([^\s]//[^\s])#ui", "%%$1%%", $line);
+
+    return $line;
 }
 
 function get_last_key($array)
@@ -1155,6 +1174,10 @@ function heading($n = 1, $str = '')
         $link = preg_replace("/^.*[>\|]+/ui", '', $link);
         $str = $link;
     }
+    //ヘッダタグ内ではboldが効かない
+    $str = preg_replace(/** @lang RegExp */
+        "#\*\*(.+?)\*\*#ui", "$1", $str);
+
 
 //    return "=" x $n . " " . $str . " " . "=" x $n;
     return str_repeat("=", $n) . " " . $str . " " . str_repeat("=", $n) . "\r\n";
