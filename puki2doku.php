@@ -711,8 +711,10 @@ REGEXP
 
         # 改行置換
 //        $line = ~s / ~$/\\\\ /;
-        $line = preg_replace(/** @lang RegExp */
-            "/~$/ui", "\\\\ ", $line);
+        if (!empty($line)) {
+            $line.='\\\\ ';
+
+        }
 
 //        $line = ~s / \&br;/\\\\ / g;
         $line = preg_replace(/** @lang RegExp */
