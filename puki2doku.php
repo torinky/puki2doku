@@ -76,6 +76,8 @@ $specified_page_file = '';
 $input_encoding = "utf-8";
 $use_heading = '';
 $destLang = 'ja';
+$_pagename = '';
+$_in_subdir = false;
 
 $smiles = [
     'smile' => ' :-) ',
@@ -426,12 +428,16 @@ function copy_attach_file($src_file)
 }*/
 
 
+/**
+ * @param string $src_file
+ * @return bool
+ */
 function convert_file($src_file = '')
 {
-    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $use_indexmenu_plugin, $ignore_unknown_macro, $destLang;
+    global $input_encoding, $dst_dir, $dont_overwrite, $verbose, $use_heading, $_pagename, $_in_subdir, $ignore_unknown_macro;
     //    my ($src_file) = @_;
 
-    $in_subdir = 0;
+    $_in_subdir = 0;
 //    $last_line = "";
 
     echo 'converting... ' . PHP_EOL;
@@ -446,22 +452,22 @@ function convert_file($src_file = '')
     $dokuwiki_filename = convert_filename($src_file);
 //    if ($dokuwiki_filename =~ /\//) {
     if (strpos($dokuwiki_filename, "/") !== false) {
-        $in_subdir = 1;
+        $_in_subdir = 1;
     }
 
     # 小文字にしたり、記号を変換してないページ名
 //    my $pagename = decode($input_encoding, pukiwiki_filename_decode($src_file));
-    $pagename = mb_convert_encoding(pukiwiki_filename_decode($src_file), 'utf-8', $input_encoding);
+    $_pagename = mb_convert_encoding(pukiwiki_filename_decode($src_file), 'utf-8', $input_encoding);
 
 //    return if ($pagename =~ /^:/); # 特殊ファイル
-    if (preg_match('/^:/ui', $pagename)) {
+    if (preg_match('/^:/ui', $_pagename)) {
         return false;
     } # 特殊ファイル
 
 //    $pagename =~ s/\.txt//;
-    $pagename = strtr($pagename, '.txt', '');
+    $_pagename = strtr($_pagename, '.txt', '');
 //    $pagename =~ s/\//:/g; # namespace の区切りは / ではなく :
-    $pagename = strtr($pagename, '/', ':');
+    $_pagename = strtr($_pagename, '/', ':');
 
     /*    my $doku_file = sprintf "%s/%s",
                                 $dst_dir,
@@ -494,16 +500,13 @@ function convert_file($src_file = '')
     }
 
     $pre = 0;
-    $prettify = 0;
-//    my @sp_buf = (); # #contents
-    $sp_buf = []; # #contents
 
 //    my @doku_lines = ();
     $doku_lines = [];
 
     # 見出しを追加。これはDokuWikiでuseheadingオプションを使う場合に有効
     if ($use_heading) {
-        $pageid = $pagename;
+        $pageid = $_pagename;
 //        $pageid =~ tr/[A-ZＡ-Ｚ]/[a-zａ-ｚ]/; # pageidは小文字
         $pageid = strtolower($pageid);
 //        push @doku_lines, "====== " . $pageid . " ======\n\n";
@@ -512,145 +515,106 @@ function convert_file($src_file = '')
 
 //    while (my $line = <$r>) {
     //1行ずつ読み込む
-    $multiLangFlag = null;
+    $block = new Blocks();
     while ($line = fgets($r)) {
 //    $line = decode($input_encoding, $line);
         $line = mb_convert_encoding($line, 'utf-8', $input_encoding);
 //        $line =~ s/[\r\n]+$//;
         $line = preg_replace("/[\r\n]+\$/ui", '', $line);
 
-        //国際化されていたらjaのみ取り出す
-        if (preg_match('/#multilang\(([a-zA-Z_]{2,8})\)[\{]{2,3}/ui', $line, $langMatches)) {
-            $multiLangFlag = $langMatches[1];
-            continue;
+        $doku_lines = $block->convert_line($line, $doku_lines, $pre);
+    }
+
+//    push @doku_lines, "</code>\n" if ($pre) ;
+    if ($pre) {
+        array_push($doku_lines, "</code>\r\n");
+    }
+
+//    $r->close;
+    fclose($r);
+
+//    my $w = new IO::File $doku_file, "w";
+    $w = fopen($doku_file, 'w');
+
+//    if (!defined $w) {
+    if ($w === false) {
+//    warn "can't open $doku_file: $!";
+        echo "can't open " . $doku_file . PHP_EOL;
+
+        return false;
+    }
+//    foreach my $line (@doku_lines){
+    foreach ($doku_lines as $line) {
+//        print $w encode("utf-8", $line);
+        fwrite($w, $line);
+    }
+//    $w->close;
+    fclose($w);
+
+    # copy last modified
+//    system("/bin/touch", "-r", $src_file, $doku_file);
+    touch($doku_file, $fileModified);
+
+    return true;
+}
+
+class Blocks
+{
+
+    private $pluginBlockMode = false, $pluginName, $pluginArgs, $pluginBlock, $pluginCageLength = 0;
+
+    /**
+     * @param string $line
+     * @param array $doku_lines
+     * @param bool $pre
+     * @return array
+     */
+    function convert_line($line, $doku_lines, &$pre, $log = false)
+    {
+        global $use_indexmenu_plugin, $_pagename, $_in_subdir;
+
+
+        //plugins
+        if (preg_match('/#(\w+)\(([\w]+)\)([{]{2,})/ui', $line, $pluginMatches)) {
+            $this->pluginBlockMode = true;
+            $this->pluginName = $pluginMatches[1] ?? '';
+            $this->pluginArgs = $pluginMatches[2] ?? '';
+            $this->pluginCageLength = strlen($pluginMatches[3] ?? '');
+            var_dump($pluginMatches);
         }
-        if ($multiLangFlag == $destLang && preg_match('/[\}]{2,3}/',$line)) {
-            $multiLangFlag = null;
-            continue;
-        }
-        //他の言語なら読み飛ばす
-        if ($multiLangFlag !== null && $multiLangFlag !== $destLang) {
-            while ($line !== false && !preg_match('/[\}]{2,3}/',$line)) {
-                $line = fgets($r);
+        if ($this->pluginBlockMode) {
+            //プラグインの中身を貯める
+            $this->pluginBlock[] = $line;
+            if (preg_match('/^[}]{' . $this->pluginCageLength . '}$/ui', $line, $pluginMatches)) {
+                $doku_lines = array_merge($doku_lines, convert_plugin($this->pluginName, $this->pluginArgs, $this->pluginBlock));
+                $this->pluginBlock = [];
+                $this->pluginBlockMode = false;
             }
-            $multiLangFlag = null;
-            continue;
+
+            return $doku_lines;
         }
 
-        # ----
-        # #contents
-//        if ($line eq "----" && scalar(@sp_buf) == 0) {
-        if (preg_match("/^----/ui", $line) && count($sp_buf) == 0) {
-//            push @sp_buf, $line;
-            array_push($sp_buf, $line);
-//            next;
-            continue;
-        } //        elsif($line eq "----" && scalar(@sp_buf) == 2) {
-        elseif (preg_match("/^----/ui", $line) && count($sp_buf) == 2) {
-//            @sp_buf = ();
-            $sp_buf = [];
-//            next;
-            continue;
-        } //        elsif($line eq "#contents" && scalar(@sp_buf) == 1) {
-        elseif (preg_match(/** @lang RegExp */
-                "/^#contents/ui", $line) && count($sp_buf) == 1
-        ) {
-            array_push($sp_buf, $line);
-//            next;
-            continue;
-            //コメント行
-        } elseif (preg_match(/** @lang RegExp */
-            "!^//.*$!ui", $line)) {
-            continue;
-        } else {
-//            foreach (@sp_buf) {
-            foreach ($sp_buf as $sp) {
-//                push @doku_lines, $_ . "\n";
-                array_push($doku_lines, $sp . "\r\n");
-            }
-//            @sp_buf = ();
-            $sp_buf = [];
+        if (convert_contents($line, $doku_lines)) {
+            return $doku_lines;
         }
-        # ----
-
 
         if ($use_indexmenu_plugin) {
 //            $line = ~s /^#ls2?\((.*)\).*$/convert_ls_indexmenu($pagename, $1)/e;
             preg_replace_callback(/** @lang RegExp */
-                "/^#ls2?\((.*)\).*$/ui", function ($matches) use ($pagename) {
-                return convert_ls_indexmenu($pagename, $matches[1]);
+                "/^#ls2?\((.*)\).*$/ui", function ($matches) use ($_pagename) {
+                return convert_ls_indexmenu($_pagename, $matches[1]);
             }, $line);
 
 //            $line = ~s /^#ls2?$/convert_ls_indexmenu($pagename)/e;
-            preg_replace("/^#ls2?$/ui", convert_ls_indexmenu($pagename), $line);
+            preg_replace("/^#ls2?$/ui", convert_ls_indexmenu($_pagename), $line);
         }
 
-        # prettify etention
-//        if ($line = ~ /^#prettify{{/) {
-        if (preg_match("/^#prettify{{/", $line)) {
-//            push @doku_lines, "<code>\n" if (!$pre) ;
-            if (!$pre) {
-                array_push($doku_lines, "<code>");
-            }
-            $prettify = 1;
-//            next;
-            continue;
-        } //        elsif($prettify){
-        elseif ($prettify) {
-//            if ($line = ~ /^\
-//                }\
-//            }/) {
-            if (preg_match(/** @lang RegExp */
-                "/^\}\}/ui"
-
-                /*            if (preg_match(<<<REGEXP
-                /^\
-                                }\
-                            }/ui
-                REGEXP*/
-                , $line)) {
-//    push @doku_lines, "</code>\n";
-                array_push($doku_lines, "</code>\r\n");
-                $prettify = 0;
-            } else {
-//                push @doku_lines, $line . "\n";
-                array_push($doku_lines, $line . "\r\n");
-            }
-            continue;
+        # prettify extension
+        if (convert_prity($line, $doku_lines, $pre)) {
+            return $doku_lines;
         }
 
-//        if ($line = ~s /^\x20// || $line =~ /^\t/) {
-        if (preg_match("/^[\x20\t]+/ui", $line)) {
-            if (!$pre) {
-//            if (scalar(@doku_lines) && $doku_lines[-1] = ~ /^\s + \- /) {
-                if (count($doku_lines) && preg_match("/^\s + \- /ui", end($doku_lines))) {
-//                $doku_lines[-1] = ~s / \n$//;
-                    preg_replace("/ \n$/ui", '', $doku_lines[get_last_key($doku_lines)]);
-                }
-//                push @doku_lines, "<code>\n";
-                array_push($doku_lines, "<code>\r\n");
-            }
-//            push @doku_lines, $line . "\n";
-            array_push($doku_lines, $line . "\r\n");
-            $pre = 1;
-//            next;
-            continue;
-        } elseif ($pre) {
-//        push @doku_lines, "</code>\n";
-            array_push($doku_lines, "</code>\r\n");
-            $pre = 0;
-        }
 
-//        if ($line = ~ /^\- + $/) {
-        //段落記号のみの行
-        if (preg_match(/** @lang RegExp */
-            "/^[\s\-*]+$/ui", $line)) {
-//            push @doku_lines, $line . "\n";
-//            array_push($doku_lines, $line . "\r\n");
-            array_push($doku_lines, "\r\n");
-//            next;
-            continue;
-        }
         //文字修飾の半分のみはhtml変換に失敗する
         //イタリック指示の半分のみを全角に置換
         if (mb_substr_count($line, '//') % 2 == 1) {
@@ -662,15 +626,15 @@ function convert_file($src_file = '')
 //        $line = ~s / \&ref\((.+?)\);/convert_ref($pagename, $1)/ge;
 //        $line = ~s /#ref\((.+?)\)/convert_ref($pagename, $1)/ge;
         preg_replace_callback(/** @lang RegExp */
-            "/[\&#].ref\((.+?)\);/ui", function ($matches) use ($pagename) {
-            return convert_ref($pagename, $matches[1]);
+            "/[\&#].ref\((.+?)\);/ui", function ($matches) use ($_pagename) {
+            return convert_ref($_pagename, $matches[1]);
         }, $line);
 
 
 //            next if ($line = ~ /^#/ && $ignore_unknown_macro);
-        if (preg_match("/^#/ui", $line) && $ignore_unknown_macro) {
-            continue;
-        }
+        /*        if (preg_match("/^#/ui", $line) && $ignore_unknown_macro) {
+                    continue;
+                }*/
 
         # definitions
 //        $line = ~s /^:(.*?)\|(.*)$/  = $1 : $2 /;
@@ -711,128 +675,29 @@ REGEXP
 
         # 改行置換
 //        $line = ~s / ~$/\\\\ /;
-        if (!empty($line)) {
-            $line.='\\\\ ';
+        if (!empty($line) && !$pre) {
+            $line .= '\\\\ ';
 
         }
         $line = decoration($line);
 
 
         # heading
-//        $line = ~s /^\*\s * ([^\*].*?)\[#.*$/heading(6, $1)/e;
-        $line = preg_replace_callback(/** @lang RegExp */
-//            "/^\*\s([^\*].*?)\[#.*$/ui",
-            "/^\*\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
-            function ($maches) {
-//                var_dump(mb_convert_variables('sjis-win','utf-8',$maches));
-//                var_dump($maches);
-//                var_dump( heading(6, $maches[1]),'sjis-win');
-//                exit;
-                return heading(6, $maches[1]);
-            }, $line);
-
-        /*        $line = ~s /^\*{
-                                2}\s * ([^\*].*?)\[#.*$/heading(5, $1)/e;*/
-        $line = preg_replace_callback(/** @lang RegExp */
-//            "/^\*{2}\s([^\*].*?)\[#.*$/ui",
-            "/^\*{2}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
-            function ($maches) {
-                return heading(5, $maches[1]);
-            }, $line);
-        /*        $line = ~s /^\*{
-                                3}\s * ([^\*].*?)\[#.*$/heading(4, $1)/e;*/
-        $line = preg_replace_callback(/** @lang RegExp */
-//            "/^\*{3}\s([^\*].*?)\[#.*$/ui",
-            "/^\*{3}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
-            function ($maches) {
-                return heading(4, $maches[1]);
-            }, $line);
-        /*        $line = ~s /^\*{
-                                4}\s * ([^\*].*?)\[#.*$/heading(3, $1)/e;*/
-        $line = preg_replace_callback(/** @lang RegExp */
-//            "/^\*{4}\s([^\*].*?)\[#.*$/ui",
-            "/^\*{4}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
-            function ($maches) {
-                return heading(3, $maches[1]);
-            }, $line);
-        /*        $line = ~s /^\*{
-                                5}\s * ([^\*].*?)\[#.*$/heading(2, $1)/e;*/
-        $line = preg_replace_callback(/** @lang RegExp */
-//            "/^\*{5}\s([^\*].*?)\[#.*$/ui",
-            "/^\*{5}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
-            function ($maches) {
-                return heading(2, $maches[1]);
-            }, $line);
+        $line = headers($line);
 
         # list
-//        $line = ~s /^(\++)\s * ([^\-]*.*)$/convert_ol($1, $2)/e;
-        $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\++)\s{0,1}([^\-]*.*)$/ui",
-            function ($matches) {
-                return convert_ol($matches[1], $matches[2] ?? '');
-            }, $line);
-
-
-//        $line = ~s /^(\- +)\s * ([^\-]*.*)$/convert_ul($1, $2)/e;
-        $line = preg_replace_callback(/** @lang RegExp */
-            "/^(\-+)\s{0,1}([^\-]*.*)$/ui",
-            function ($matches) {
-                return convert_ul($matches[1], $matches[2] ?? '');
-            }, $line);
+        $line = convert_list($line);
 
         # smile
 //        $line = ~s / \&(\w +);/smile($1)/ge;
-        $line = preg_replace_callback(/** @lang RegExp */
-            "/ \&(\w+);/ui",
-            function ($matches) {
-                return smile($matches[1]);
-            }, $line);
+        $line = convert_smile($line);
 
         # table
 //        if ($line = ~ /^\| /) {
-        if (preg_match(/** @lang RegExp */
-            "/^\|/ui", $line)) {
-            $line = convert_table($line);
-//            var_dump($line);
-        } else {
-            # TODO
-            # reset format
-        }
-
-        # table は直前の行が空行じゃないとダメっぽい
-//        if (scalar(@doku_lines)) {
-//        $doku_lines = implode('',$doku_lines);
-        if (!empty($doku_lines)) {
-            if (
-//                $line = ~ /^[\^\|]/
-                //今の行がtable
-                preg_match(/** @lang RegExp */
-                    "/^[|\^]/ui", $line)
-//             && $doku_lines[-1] !~ /^[\^\|]/
-                //直前の行がtableでない
-                && preg_match(/** @lang RegExp */
-                    "/^[^|\^]/ui", end($doku_lines))
-//            && $doku_lines[-1] ne "")
-                && end($doku_lines) != ""
-            ) {
-//                push @doku_lines, "\n";
-                array_push($doku_lines, "\r\n");
-            }
-        }
+        tables($line, $doku_lines);
 
         # link (中に|を含むので table より後に処理)
-//        $line = ~s / \[\[(.+?)\]\] / convert_link($1, $in_subdir)/ge;
-        $line = preg_replace_callback(/** @lang RegExp */
-            "/ \[\[(.+?)\]\] /ui", function ($matches) use ($in_subdir) {
-            return convert_link($matches[1], $in_subdir);
-        }, $line);
-
-        # email link (mailto)
-//        $line = ~s / (^|[^\[])([a - zA - Z0 - 9\._\-]+\@[a - zA - Z0 - 9\.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/$1\[\[$2\]\]$3 / g;
-        $line = preg_replace(/** @lang RegExp */
-            "/ (^|[^\[])([a - zA - Z0 - 9._\-]+@[a - zA - Z0 - 9.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/ui",
-            /** @lang RegExp */
-            "$1\[\[$2\]\]$3", $line);
+        $line = links($_in_subdir, $line);
 
 //        $line = ~s / \&nbsp;/\x20 / g;
         $line = preg_replace(/** @lang RegExp */
@@ -846,39 +711,302 @@ REGEXP
 //            push @doku_lines, $line . "\n";
             array_push($doku_lines, $line . "\r\n");
         }
+
+//    var_dump($line);
+//    var_dump($doku_lines);
+
+        /*        if ($log) {
+                    var_dump($line);
+                    var_dump($doku_lines);
+                }*/
+
+        return $doku_lines;
+    }
+}
+
+/**
+ * @param string $line
+ * @param array $doku_lines
+ * @param int $pre
+ * @return bool
+ */
+function convert_prity($line = '', &$doku_lines = [], &$pre = 0)
+{
+    static $prettify = 0;
+    //        if ($line = ~ /^#prettify{{/) {
+    if (preg_match("/^#prettify{{/", $line)) {
+//            push @doku_lines, "<code>\n" if (!$pre) ;
+        if (!$pre) {
+            array_push($doku_lines, "<code>");
+        }
+        $prettify = 1;
+
+//            next;
+        return true;
+    } //        elsif($prettify){
+    elseif ($prettify) {
+//            if ($line = ~ /^\
+//                }\
+//            }/) {
+        if (preg_match(/** @lang RegExp */
+            "/^\}\}/ui"
+
+            /*            if (preg_match(<<<REGEXP
+            /^\
+                            }\
+                        }/ui
+            REGEXP*/
+            , $line)) {
+//    push @doku_lines, "</code>\n";
+            array_push($doku_lines, "</code>\r\n");
+            $prettify = 0;
+        } else {
+//                push @doku_lines, $line . "\n";
+            array_push($doku_lines, $line . "\r\n");
+        }
+
+        return true;
     }
 
-//    push @doku_lines, "</code>\n" if ($pre) ;
-    if ($pre) {
+//        if ($line = ~s /^\x20// || $line =~ /^\t/) {
+    if (preg_match("/^[\x20\t]+/ui", $line)) {
+        if (!$pre) {
+//            if (scalar(@doku_lines) && $doku_lines[-1] = ~ /^\s + \- /) {
+            if (count($doku_lines) && preg_match("/^\s + \- /ui", end($doku_lines))) {
+//                $doku_lines[-1] = ~s / \n$//;
+                preg_replace("/ \n$/ui", '', $doku_lines[get_last_key($doku_lines)]);
+            }
+//                push @doku_lines, "<code>\n";
+            array_push($doku_lines, "<code>\r\n");
+        }
+//            push @doku_lines, $line . "\n";
+        array_push($doku_lines, $line . "\r\n");
+        $pre = 1;
+
+//            next;
+        return true;
+    } elseif ($pre) {
+//        push @doku_lines, "</code>\n";
         array_push($doku_lines, "</code>\r\n");
+        $pre = 0;
     }
 
-//    $r->close;
-    fclose($r);
+    return false;
 
-//    my $w = new IO::File $doku_file, "w";
-    $w = fopen($doku_file, 'w');
+}
 
-//    if (!defined $w) {
-    if ($w === false) {
-//    warn "can't open $doku_file: $!";
-        echo "can't open " . $doku_file . PHP_EOL;
+/**
+ * @param $line
+ * @param $doku_lines
+ * @return bool
+ */
+function convert_contents($line, &$doku_lines)
+{
+    //        if ($line eq "----" && scalar(@sp_buf) == 0) {
+    static $sp_buf = [];
+    if (preg_match("/^----/ui", $line) && count($sp_buf) == 0) {
+//            push @sp_buf, $line;
+        array_push($sp_buf, $line);
 
-        return false;
+//            next;
+        return true;
+    } //        elsif($line eq "----" && scalar(@sp_buf) == 2) {
+    elseif (preg_match("/^----/ui", $line) && count($sp_buf) == 2) {
+//            @sp_buf = ();
+        $sp_buf = [];
+
+//            next;
+        return true;
+    } //        elsif($line eq "#contents" && scalar(@sp_buf) == 1) {
+    elseif (preg_match(/** @lang RegExp */
+            "/^#contents/ui", $line) && count($sp_buf) == 1
+    ) {
+        array_push($sp_buf, $line);
+
+//            next;
+        return true;
+        //コメント行
+    } elseif (preg_match(/** @lang RegExp */
+        "!^//.*$!ui", $line)) {
+        return true;
+    } else {
+//            foreach (@sp_buf) {
+        foreach ($sp_buf as $sp) {
+//                push @doku_lines, $_ . "\n";
+            array_push($doku_lines, $sp . "\r\n");
+        }
+//            @sp_buf = ();
+        $sp_buf = [];
     }
-//    foreach my $line (@doku_lines){
-    foreach ($doku_lines as $line) {
-//        print $w encode("utf-8", $line);
-        fwrite($w, $line);
+
+    return false;
+}
+
+/**
+ * @param $in_subdir
+ * @param $line
+ * @return string|string[]|null
+ */
+function links($in_subdir, $line)
+{
+//        $line = ~s / \[\[(.+?)\]\] / convert_link($1, $in_subdir)/ge;
+    $line = preg_replace_callback(/** @lang RegExp */
+        "/ \[\[(.+?)\]\] /ui", function ($matches) use ($in_subdir) {
+        return convert_link($matches[1], $in_subdir);
+    }, $line);
+
+    # email link (mailto)
+//        $line = ~s / (^|[^\[])([a - zA - Z0 - 9\._\-]+\@[a - zA - Z0 - 9\.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/$1\[\[$2\]\]$3 / g;
+    $line = preg_replace(/** @lang RegExp */
+        "/ (^|[^\[])([a - zA - Z0 - 9._\-]+@[a - zA - Z0 - 9.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/ui",
+        /** @lang RegExp */
+        "$1\[\[$2\]\]$3", $line);
+
+    return $line;
+}
+
+/**
+ * @param string $line
+ * @param array $doku_lines
+ */
+function tables($line, &$doku_lines)
+{
+    if (preg_match(/** @lang RegExp */
+        "/^\|/ui", $line)) {
+        $line = convert_table($line);
+//            var_dump($line);
+    } else {
+        # TODO
+        # reset format
     }
-//    $w->close;
-    fclose($w);
 
-    # copy last modified
-//    system("/bin/touch", "-r", $src_file, $doku_file);
-    touch($doku_file, $fileModified);
+    # table は直前の行が空行じゃないとダメっぽい
+//        if (scalar(@doku_lines)) {
+//        $doku_lines = implode('',$doku_lines);
+    if (!empty($doku_lines)) {
+        if (
+//                $line = ~ /^[\^\|]/
+            //今の行がtable
+            preg_match(/** @lang RegExp */
+                "/^[|\^]/ui", $line)
+//             && $doku_lines[-1] !~ /^[\^\|]/
+            //直前の行がtableでない
+            && preg_match(/** @lang RegExp */
+                "/^[^|\^]/ui", end($doku_lines))
+//            && $doku_lines[-1] ne "")
+            && end($doku_lines) != ""
+        ) {
+//                push @doku_lines, "\n";
+            array_push($doku_lines, "\r\n");
+        }
+    }
 
-    return true;
+    return;
+}
+
+/**
+ * @param $line
+ * @return string|string[]|null
+ */
+function convert_smile($line)
+{
+    $line = preg_replace_callback(/** @lang RegExp */
+        "/ \&(\w+);/ui",
+        function ($matches) {
+            return smile($matches[1]);
+        }, $line);
+
+    return $line;
+}
+
+/**
+ * @param $line
+ * @return string|string[]|null
+ */
+function convert_list($line)
+{
+//        $line = ~s /^(\++)\s * ([^\-]*.*)$/convert_ol($1, $2)/e;
+    $line = preg_replace_callback(/** @lang RegExp */
+        "/^(\++)\s{0,1}([^\-]*.*)$/ui",
+        function ($matches) {
+            return convert_ol($matches[1], $matches[2] ?? '');
+        }, $line);
+
+
+//        $line = ~s /^(\- +)\s * ([^\-]*.*)$/convert_ul($1, $2)/e;
+    $line = preg_replace_callback(/** @lang RegExp */
+        "/^(\-+)\s{0,1}([^\-]*.*)$/ui",
+        function ($matches) {
+            return convert_ul($matches[1], $matches[2] ?? '');
+        }, $line);
+
+    return $line;
+}
+
+/**
+ * @param $line
+ * @return string|string[]|null
+ */
+function headers($line)
+{
+
+    //        if ($line = ~ /^\- + $/) {
+    //段落記号のみの行
+    if (preg_match(/** @lang RegExp */
+        "/^[\s\-*]+$/ui", $line)) {
+//            push @doku_lines, $line . "\n";
+//            array_push($doku_lines, $line . "\r\n");
+//        array_push($doku_lines, "\r\n");
+//            next;
+        return "\r\n";
+    }
+
+//        $line = ~s /^\*\s * ([^\*].*?)\[#.*$/heading(6, $1)/e;
+    $line = preg_replace_callback(/** @lang RegExp */
+//            "/^\*\s([^\*].*?)\[#.*$/ui",
+        "/^\*\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
+        function ($maches) {
+//                var_dump(mb_convert_variables('sjis-win','utf-8',$maches));
+//                var_dump($maches);
+//                var_dump( heading(6, $maches[1]),'sjis-win');
+//                exit;
+            return heading(6, $maches[1]);
+        }, $line);
+
+    /*        $line = ~s /^\*{
+                            2}\s * ([^\*].*?)\[#.*$/heading(5, $1)/e;*/
+    $line = preg_replace_callback(/** @lang RegExp */
+//            "/^\*{2}\s([^\*].*?)\[#.*$/ui",
+        "/^\*{2}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
+        function ($maches) {
+            return heading(5, $maches[1]);
+        }, $line);
+    /*        $line = ~s /^\*{
+                            3}\s * ([^\*].*?)\[#.*$/heading(4, $1)/e;*/
+    $line = preg_replace_callback(/** @lang RegExp */
+//            "/^\*{3}\s([^\*].*?)\[#.*$/ui",
+        "/^\*{3}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
+        function ($maches) {
+            return heading(4, $maches[1]);
+        }, $line);
+    /*        $line = ~s /^\*{
+                            4}\s * ([^\*].*?)\[#.*$/heading(3, $1)/e;*/
+    $line = preg_replace_callback(/** @lang RegExp */
+//            "/^\*{4}\s([^\*].*?)\[#.*$/ui",
+        "/^\*{4}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
+        function ($maches) {
+            return heading(3, $maches[1]);
+        }, $line);
+    /*        $line = ~s /^\*{
+                            5}\s * ([^\*].*?)\[#.*$/heading(2, $1)/e;*/
+    $line = preg_replace_callback(/** @lang RegExp */
+//            "/^\*{5}\s([^\*].*?)\[#.*$/ui",
+        "/^\*{5}\s{0,1}([^\*].*?)((\[#.*$)|(\s*$))/ui",
+        function ($maches) {
+            return heading(2, $maches[1]);
+        }, $line);
+
+    return $line;
 }
 
 /**
@@ -890,8 +1018,8 @@ function decoration($line)
     if (empty($line)) {
         return '';
     }
-    var_dump('decoration!');
-    var_dump($line);
+//    var_dump('decoration!');
+//    var_dump($line);
 //        $line = ~s / \&br;/\\\\ / g;
     $line = preg_replace(/** @lang RegExp */
         "/\&br;/ui", "\\\\ ", $line);
@@ -938,6 +1066,65 @@ function get_last_key($array)
     end($array);
 
     return key($array);
+}
+
+/**
+ * @param string $pluginName
+ * @param string $pluginArgs
+ * @param array $pluginBlock
+ * @return array
+ */
+function convert_plugin($pluginName = '', $pluginArgs = '', $pluginBlock = [])
+{
+    var_dump('plugin!');
+    var_dump($pluginName);
+    var_dump($pluginArgs);
+//    var_dump($pluginBlock);
+
+    if (empty($pluginBlock)) {
+        return [];
+    }
+
+    global $destLang;
+    $results = [];
+    $pluginPre = 0;
+    //プラグインの指示部分を削除
+    $startLine = array_shift($pluginBlock);
+    $endLine = array_pop($pluginBlock);
+
+
+    switch ($pluginName) {
+        case 'multilang':
+            /*                //他の言語なら読み飛ばす
+                            if ($multiLangFlag !== null && $multiLangFlag !== $destLang) {
+                                while ($line !== false && !preg_match('/[\}]{2,3}/',$line)) {
+                                    $line = fgets($r);
+                                }
+                                $multiLangFlag = null;
+                                continue;
+                            }*/
+            $block = new Blocks();
+            if ($pluginArgs == $destLang) {
+//                var_dump($pluginBlock);
+                foreach ($pluginBlock as $pKey => $line) {
+
+                    //国際化されていたらjaのみ取り出す
+                    /*                if (preg_match('/#multilang\(([a-zA-Z_]{2,8})\)[\{]{2,3}/ui', $line, $langMatches)) {
+                                        $multiLangFlag = $langMatches[1];
+                                        continue;
+                                    }*/
+//                if ($pluginArgs == $destLang && preg_match('/[\}]{2,3}/',$line)) {
+                    $results = $block->convert_line($line, $results, $pluginPre, true);
+//                    var_dump($line);
+//                    var_dump($results);
+//                    continue;
+                }
+            }
+            break;
+    }
+    var_dump($results);
+
+    return $results;
 }
 
 //sub convert_file {
@@ -1477,6 +1664,10 @@ function convert_ol($mark = '', $str = '')
 //    my($mark, $str) = @_;
 
 //    my $space = "  " x length($mark);
+    $checkStr = trim($str);
+    if (empty($checkStr) || $checkStr == '\\\\') {
+        return $str;
+    }
     $space = str_repeat("  ", strlen($mark));
 
     return $space . "- " . $str;
@@ -1499,6 +1690,10 @@ function convert_ul($mark = '', $str = '')
 {
 //    my($mark, $str) = @_;
 
+    $checkStr = trim($str);
+    if (empty($checkStr) || $checkStr == '\\\\') {
+        return $str;
+    }
 //    my $space = "  " x length($mark);
     $space = str_repeat("  ", strlen($mark));
 
