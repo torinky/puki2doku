@@ -637,19 +637,12 @@ class Blocks
                 }*/
 
         # definitions
+        // convert definitions. need definition list plugin
+        // https://www.dokuwiki.org/plugin:definitionlist
+
 //        $line = ~s /^:(.*?)\|(.*)$/  = $1 : $2 /;
         $line = preg_replace(/** @lang RegExp */
-            "/^:(.*?)\|(.*)$/ui", "  = $1 : $2 ", $line);
-        /*        $line = preg_replace_callback("/^:(.*?)\|(.*)$/ui", function ($matches) {
-                    if (!isset($matches[1])) {
-                        return "";
-                    }
-                    if (!isset($matches[2])) {
-                        return "  = " . $matches[1] . " :  ";
-                    }
-                    return "  = " . $matches[1] . " : " . $matches[2] . " ";
-
-                }, $line);*/
+            "/^:(.*?)\|(.*)$/ui", "  ; $1 : $2 ", $line);
 
         # 装飾を削る (2回なのは入れ子対応、3回やっとく？)
 //        $line = ~s / \&(\w +)\(([^\(\)]+?)\){
@@ -1122,7 +1115,8 @@ function convert_plugin($pluginName = '', $pluginArgs = '', $pluginBlock = [])
             }
             break;
     }
-    var_dump($results);
+
+//    var_dump($results);
 
     return $results;
 }
