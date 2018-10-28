@@ -668,7 +668,7 @@ REGEXP
 
         # 改行置換
 //        $line = ~s / ~$/\\\\ /;
-        if (!empty($line) && !$pre) {
+        if (!empty($line) && !preg_match("/\\\\\s$/ui", $line) && !$pre) {
             $line .= '\\\\ ';
 
         }
@@ -697,7 +697,7 @@ REGEXP
             "/ &nbsp;/ui", "\x20 ", $line);
 
 //        if ($line = ~ /\\\\$/) {
-        if (preg_match("/\\\\$/ui", $line)) {
+        if (preg_match("/\\\\$/ui", $line) && !$pre) {
 //            push @doku_lines, $line . " ";
             array_push($doku_lines, $line . " ");
         } else {
