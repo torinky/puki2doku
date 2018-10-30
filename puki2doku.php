@@ -682,7 +682,13 @@ REGEXP
 
         # 改行置換
 //        $line = ~s / ~$/\\\\ /;
-        if (!empty($line) && !preg_match("/\\\\\s$/ui", $line) && !$pre) {
+        if (!empty($line)
+            //not header
+            && !preg_match("/^\*+/ui", $line)
+            //not has nr
+            && !preg_match("/\\\\\s$/ui", $line)
+            && !$pre
+        ) {
             $line .= '\\\\ ';
 
         }
