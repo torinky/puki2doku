@@ -569,12 +569,13 @@ class Blocks
      * @param bool $pre
      * @return array
      */
-    function convert_line($line, $doku_lines, &$pre, $log = false)
+    function convert_line($line, $doku_lines, &$pre)
     {
         global $use_indexmenu_plugin, $_pagename, $_in_subdir;
 
 
         //plugins
+        //引数があるブロックプライン
         if (preg_match('/#(\w+)\(([\w]+)\)([{]{2,})/ui', $line, $pluginMatches)) {
             $this->pluginBlockMode = true;
             $this->pluginName = $pluginMatches[1] ?? '';
@@ -582,11 +583,24 @@ class Blocks
             $this->pluginCageLength = strlen($pluginMatches[3] ?? '');
             var_dump($pluginMatches);
         }
+        //引数がないブロックプライン
+        if (preg_match('/#(\w+)([{]{2,})$/ui', $line, $pluginMatches)) {
+            $this->pluginBlockMode = true;
+            $this->pluginName = $pluginMatches[1] ?? '';
+            $this->pluginArgs = false;
+            $this->pluginCageLength = strlen($pluginMatches[2] ?? '');
+            var_dump($pluginMatches);
+        }
         if ($this->pluginBlockMode) {
             //プラグインの中身を貯める
             $this->pluginBlock[] = $line;
             if (preg_match('/^[}]{' . $this->pluginCageLength . '}$/ui', $line, $pluginMatches)) {
-                $doku_lines = array_merge($doku_lines, convert_plugin($this->pluginName, $this->pluginArgs, $this->pluginBlock));
+                if ($this->pluginArgs === false) {
+                    $doku_lines = array_merge($doku_lines, convert_blockPlugin($this->pluginName, $this->pluginBlock));
+
+                } else {
+                    $doku_lines = array_merge($doku_lines, convert_blockWithArgsPlugin($this->pluginName, $this->pluginArgs, $this->pluginBlock));
+                }
                 $this->pluginBlock = [];
                 $this->pluginBlockMode = false;
             }
@@ -1061,15 +1075,109 @@ function get_last_key($array)
     return key($array);
 }
 
+function convert_blockPlugin($pluginName = '', $pluginBlock = [])
+{
+    var_dump('plugin!');
+    var_dump($pluginName);
+//    var_dump($pluginBlock);
+
+    if (empty($pluginBlock)) {
+        return [];
+    }
+
+    global $destLang;
+    $results = [];
+    $pluginPre = 0;
+    //プラグインの指示部分を削除
+    $startLine = array_shift($pluginBlock);
+    $endLine = array_pop($pluginBlock);
+
+
+    switch ($pluginName) {
+        case 'tabs':
+            //配列に分割
+            $tabs = [];
+            foreach ($pluginBlock as $line) {
+                if (preg_match("/<<tab>>(.+)$/ui", $line, $tabMatches)) {
+                    $tabName = $tabMatches[1];
+                    $tabs[$tabName] = [];
+                } elseif (!empty($tabName)) {
+                    $tabs[$tabName][] = $line;
+                }
+            }
+
+            $tabTitles = [];
+            $results = [];
+            foreach ($tabs as $tabName => $tabContent) {
+                $tabId = prityHash($tabName);
+                $tabTitles[] = '  * [[#tab-' . $tabId . '|' . $tabName . ']]' . "\n";
+                $tabContentConverted = [];
+
+                $block = new Blocks();
+                foreach ($tabContent as $tabContentLine) {
+                    $tabContentConverted = $block->convert_line($tabContentLine, $tabContentConverted, $pluginPre);
+
+                }
+
+                $tabContentConverted = array_merge(
+                    [
+                        '<pane id="tab-' . $tabId . '">' . "\n",
+                    ],
+                    $tabContentConverted,
+                    [
+                        '</pane>' . "\n",
+                    ]
+                );
+
+                /*
+                <tabs>
+                  * [[#tab-foo|Foo]]
+                  * [[#tab-bar|Bar]]
+
+                <pane id="tab-foo">
+                aaa
+                </pane>
+                </tabs>
+                */
+
+                $results = array_merge($results, $tabContentConverted);
+            }
+            $results = array_merge(
+                ['<tabs>' . "\n"],
+                $tabTitles,
+                ["\n"],
+                $results,
+                ['</tabs>' . "\n"]
+            );
+
+
+            break;
+    }
+
+//    var_dump($results);
+
+    return $results;
+
+}
+
+/**
+ * @param $data
+ * @param string $algorithm
+ * @return string
+ */
+function prityHash($data, $algorithm = 'CRC32')
+{
+    return strtolower(strtr(rtrim(base64_encode(pack('H*', hash($algorithm, $data))), '='), '+/', '-_'));
+}
 /**
  * @param string $pluginName
  * @param string $pluginArgs
  * @param array $pluginBlock
  * @return array
  */
-function convert_plugin($pluginName = '', $pluginArgs = '', $pluginBlock = [])
+function convert_blockWithArgsPlugin($pluginName = '', $pluginArgs = '', $pluginBlock = [])
 {
-    var_dump('plugin!');
+    var_dump('args plugin!');
     var_dump($pluginName);
     var_dump($pluginArgs);
 //    var_dump($pluginBlock);
@@ -1088,29 +1196,15 @@ function convert_plugin($pluginName = '', $pluginArgs = '', $pluginBlock = [])
 
     switch ($pluginName) {
         case 'multilang':
-            /*                //他の言語なら読み飛ばす
-                            if ($multiLangFlag !== null && $multiLangFlag !== $destLang) {
-                                while ($line !== false && !preg_match('/[\}]{2,3}/',$line)) {
-                                    $line = fgets($r);
-                                }
-                                $multiLangFlag = null;
-                                continue;
-                            }*/
+            //他の言語なら読み飛ばす
             $block = new Blocks();
             if ($pluginArgs == $destLang) {
 //                var_dump($pluginBlock);
                 foreach ($pluginBlock as $pKey => $line) {
-
                     //国際化されていたらjaのみ取り出す
-                    /*                if (preg_match('/#multilang\(([a-zA-Z_]{2,8})\)[\{]{2,3}/ui', $line, $langMatches)) {
-                                        $multiLangFlag = $langMatches[1];
-                                        continue;
-                                    }*/
-//                if ($pluginArgs == $destLang && preg_match('/[\}]{2,3}/',$line)) {
                     $results = $block->convert_line($line, $results, $pluginPre, true);
 //                    var_dump($line);
 //                    var_dump($results);
-//                    continue;
                 }
             }
             break;

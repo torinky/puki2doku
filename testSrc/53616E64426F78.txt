@@ -206,3 +206,26 @@ c-bg+eade>el16ab<c+degf+el8>a<ag>gf+<f+e>ed+<d+f+c-e<ed>dc+<c+>b>ba+b<c+>a+b<gef
 $$p(d,w_n)=p(d)\sum_z p(w_n|z)p(z|d)$$
 
 #comment
+
+
+** タブのテスト
+
+#tabs{{{
+<<tab>>テストA
+あああああ
+いいいいい
+ううううう
+
+<<tab>>テストB
+あああああ
+いいいいい
+|~1|~2|~3|
+|a|b|c|
+|A|B|C|
+ううううう
+
+<<tab>>テストC
+|~1|~2|~3|
+|a|b|c|
+|A|B|C|
+}}}
