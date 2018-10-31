@@ -208,7 +208,7 @@ $$p(d,w_n)=p(d)\sum_z p(w_n|z)p(z|d)$$
 #comment
 
 
-** タブのテスト
+** タブプラグインのテスト
 
 #tabs{{{
 <<tab>>テストA
@@ -229,3 +229,10 @@ $$p(d,w_n)=p(d)\sum_z p(w_n|z)p(z|d)$$
 |a|b|c|
 |A|B|C|
 }}}
+
+
+** styleプラグインのテスト
+#style(class=hoge,style=float:right;border:black 1px solid;){{
+[[&ref(lena.png);>http://www.cs.cmu.edu/~chuck/lennapg/]]
+}}
+#style(style=clear:both;,end)

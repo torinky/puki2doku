@@ -576,7 +576,7 @@ class Blocks
 
         //plugins
         //引数があるブロックプライン
-        if (preg_match('/#(\w+)\(([\w]+)\)([{]{2,})/ui', $line, $pluginMatches)) {
+        if (preg_match('/#(\w+)\((.+)\)([{]{2,})/ui', $line, $pluginMatches)) {
             $this->pluginBlockMode = true;
             $this->pluginName = $pluginMatches[1] ?? '';
             $this->pluginArgs = $pluginMatches[2] ?? '';
@@ -584,7 +584,8 @@ class Blocks
             var_dump($pluginMatches);
         }
         //引数がないブロックプライン
-        if (preg_match('/#(\w+)([{]{2,})$/ui', $line, $pluginMatches)) {
+        if (preg_match(/** @lang regex */
+            '/#(\w+)([{]{2,})$/ui', $line, $pluginMatches)) {
             $this->pluginBlockMode = true;
             $this->pluginName = $pluginMatches[1] ?? '';
             $this->pluginArgs = false;
@@ -1081,6 +1082,11 @@ function get_last_key($array)
     return key($array);
 }
 
+/**
+ * @param string $pluginName
+ * @param array $pluginBlock
+ * @return array
+ */
 function convert_blockPlugin($pluginName = '', $pluginBlock = [])
 {
     var_dump('plugin!');
@@ -1113,7 +1119,6 @@ function convert_blockPlugin($pluginName = '', $pluginBlock = [])
             }
 
             $tabTitles = [];
-            $results = [];
             foreach ($tabs as $tabName => $tabContent) {
                 $tabId = prityHash($tabName);
                 $tabTitles[] = '  * [[#tab-' . $tabId . '|' . $tabName . ']]' . "\n";
@@ -1157,6 +1162,9 @@ function convert_blockPlugin($pluginName = '', $pluginBlock = [])
             );
 
 
+            break;
+        default:
+            $results = convert_block($pluginBlock, $results, $pluginPre);
             break;
     }
 
@@ -1202,21 +1210,37 @@ function convert_blockWithArgsPlugin($pluginName = '', $pluginArgs = '', $plugin
 
     switch ($pluginName) {
         case 'multilang':
+            //国際化されていたらjaのみ取り出す
             //他の言語なら読み飛ばす
-            $block = new Blocks();
             if ($pluginArgs == $destLang) {
-//                var_dump($pluginBlock);
-                foreach ($pluginBlock as $pKey => $line) {
-                    //国際化されていたらjaのみ取り出す
-                    $results = $block->convert_line($line, $results, $pluginPre, true);
-//                    var_dump($line);
-//                    var_dump($results);
-                }
+                $results = convert_block($pluginBlock, $results, $pluginPre);
             }
+            break;
+        default:
+            $results = convert_block($pluginBlock, $results, $pluginPre);
             break;
     }
 
 //    var_dump($results);
+
+    return $results;
+}
+
+/**
+ * @param $pluginBlock
+ * @param $results
+ * @param $pluginPre
+ * @return array
+ */
+function convert_block($pluginBlock, $results, &$pluginPre): array
+{
+    $block = new Blocks();
+//                var_dump($pluginBlock);
+    foreach ($pluginBlock as $pKey => $line) {
+        $results = $block->convert_line($line, $results, $pluginPre, true);
+//                    var_dump($line);
+//                    var_dump($results);
+    }
 
     return $results;
 }
