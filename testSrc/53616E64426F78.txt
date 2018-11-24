@@ -93,6 +93,15 @@ URLやメールアドレスは自動的にリンクになります
 - 電話番号 -- tel:0123-456-7890
 - URLが各種画像ファイルであればそのまま表示します
 -- http://pukiwiki.sourceforge.jp/image/b_pukiwiki.official.png
+- [[help]]
+[[help]]
+- [[formatrule#ページ名]]
+[[formatrule#ページ名]]
+- [[ヘルプ>help]]
+[[ヘルプ>help]]
+- [[エイリアスのテスト>formatrule#ページ名]]
+[[エイリアスのテスト>formatrule#ページ名]]
+
 * ''その他の文字装飾'' [#l89b765d]
 
  整形済みテキスト整形済みテキスト整形済みテキスト

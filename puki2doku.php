@@ -865,14 +865,14 @@ function links($in_subdir, $line)
 {
 //        $line = ~s / \[\[(.+?)\]\] / convert_link($1, $in_subdir)/ge;
     $line = preg_replace_callback(/** @lang RegExp */
-        "/ \[\[(.+?)\]\] /ui", function ($matches) use ($in_subdir) {
+        "/\[\[(.+?)\]\]/ui", function ($matches) use ($in_subdir) {
         return convert_link($matches[1], $in_subdir);
     }, $line);
 
     # email link (mailto)
 //        $line = ~s / (^|[^\[])([a - zA - Z0 - 9\._\-]+\@[a - zA - Z0 - 9\.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/$1\[\[$2\]\]$3 / g;
     $line = preg_replace(/** @lang RegExp */
-        "/ (^|[^\[])([a - zA - Z0 - 9._\-]+@[a - zA - Z0 - 9.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/ui",
+        "/(^|[^\[])([a - zA - Z0 - 9._\-]+@[a - zA - Z0 - 9.]+\.[a - zA - Z0 - 9] +)([^\]]|$)/ui",
         /** @lang RegExp */
         "$1\[\[$2\]\]$3", $line);
 
