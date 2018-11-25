@@ -575,23 +575,25 @@ class Blocks
 
 
         //plugins
-        //引数があるブロックプライン
-        if (preg_match('/#(\w+)\((.+)\)([{]{2,})/ui', $line, $pluginMatches)) {
-            $this->pluginBlockMode = true;
-            $this->pluginName = $pluginMatches[1] ?? '';
-            $this->pluginArgs = $pluginMatches[2] ?? '';
-            $this->pluginCageLength = strlen($pluginMatches[3] ?? '');
-            var_dump($pluginMatches);
+        //引数があるブロックプラグイン
+        if ($this->pluginBlockMode == false) {
+            if (preg_match('/#(\w+)\((.+)\)([{]{2,})/ui', $line, $pluginMatches)) {
+                $this->pluginBlockMode = true;
+                $this->pluginName = $pluginMatches[1] ?? '';
+                $this->pluginArgs = $pluginMatches[2] ?? '';
+                $this->pluginCageLength = strlen($pluginMatches[3] ?? '');
+                var_dump($pluginMatches);
+            } //引数がないブロックプラグイン
+            elseif (preg_match(/** @lang regex */
+                '/#(\w+)([{]{2,})$/ui', $line, $pluginMatches)) {
+                $this->pluginBlockMode = true;
+                $this->pluginName = $pluginMatches[1] ?? '';
+                $this->pluginArgs = false;
+                $this->pluginCageLength = strlen($pluginMatches[2] ?? '');
+                var_dump($pluginMatches);
+            }
         }
-        //引数がないブロックプライン
-        if (preg_match(/** @lang regex */
-            '/#(\w+)([{]{2,})$/ui', $line, $pluginMatches)) {
-            $this->pluginBlockMode = true;
-            $this->pluginName = $pluginMatches[1] ?? '';
-            $this->pluginArgs = false;
-            $this->pluginCageLength = strlen($pluginMatches[2] ?? '');
-            var_dump($pluginMatches);
-        }
+
         if ($this->pluginBlockMode) {
             //プラグインの中身を貯める
             $this->pluginBlock[] = $line;
@@ -1215,6 +1217,9 @@ function convert_blockWithArgsPlugin($pluginName = '', $pluginArgs = '', $plugin
             if ($pluginArgs == $destLang) {
                 $results = convert_block($pluginBlock, $results, $pluginPre);
             }
+            break;
+        case 'style':
+            $results = convert_block($pluginBlock, $results, $pluginPre);
             break;
         default:
             $results = convert_block($pluginBlock, $results, $pluginPre);
@@ -2002,11 +2007,11 @@ function convert_filename($filename = '')
 
     # マルチバイト => ascii の正規化 結果 _ になるので _ に置換
 //    $decoded = ~s / [$KIGO_STR] +/_ / g;
-    $decoded = preg_replace("/ [" . $KIGO_STR . "] +/ui", "_ ", $decoded);
+    $decoded = preg_replace("/[" . $KIGO_STR . "]+/ui", "_ ", $decoded);
 
     # 半角記号のうち .-/ 以外を _ に置換(連続するものは1つにまとめる)
 //    $decoded = ~s / [\x20 - \x2c\x3a - \x40\x5b - \x60\x7b - \x7e] +/_ / g;
-    $decoded = preg_replace("/ [\x20 - \x2c\x3a - \x40\x5b - \x60\x7b - \x7e] +/ui", "_ ", $decoded);
+    $decoded = preg_replace("/[\x20 - \x2c\x3a - \x40\x5b - \x60\x7b - \x7e]+/ui", "_ ", $decoded);
 
     # 末尾の _ は削る
 //    $decoded = ~s / [_\.\-]+.txt$/.txt /;

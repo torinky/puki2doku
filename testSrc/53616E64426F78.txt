@@ -245,3 +245,29 @@ $$p(d,w_n)=p(d)\sum_z p(w_n|z)p(z|d)$$
 [[&ref(lena.png);>http://www.cs.cmu.edu/~chuck/lennapg/]]
 }}
 #style(style=clear:both;,end)
+
+#style(class=hoge2,style=float:right;border:black 1px solid;){{
+
+** スタイルプラグインの中のタブプラグインのテスト
+
+#tabs{{{
+<<tab>>テストA1
+あああああ
+いいいいい
+ううううう
+
+<<tab>>テストB1
+あああああ
+いいいいい
+|~1|~2|~3|
+|a|b|c|
+|A|B|C|
+ううううう
+
+<<tab>>テストC1
+|~1|~2|~3|
+|a|b|c|
+|A|B|C|
+}}}
+
+}}
